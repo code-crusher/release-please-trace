@@ -3535,6 +3535,67 @@ describe('Manifest', () => {
       );
     });
 
+    it('should use release version even if it differs from the manifest version', async () => {
+      // Regression test for #2938: after releasing a major version bump,
+      // the manifest file on the target branch may still reference an
+      // older version (e.g. the release commit has not landed yet or the
+      // manifest was not updated). The latest GitHub release should still
+      // be honored, rather than falling back to an old tag.
+      mockReleases(sandbox, github, [
+        {
+          id: 123456,
+          sha: 'abc123',
+          tagName: 'v3.0.0',
+          url: 'https://github.com/fake-owner/fake-repo/releases/tag/v3.0.0',
+        },
+      ]);
+      mockTags(sandbox, github, [
+        {
+          name: 'v2.8.0',
+          sha: 'old456',
+        },
+      ]);
+      mockCommits(sandbox, github, [
+        {
+          sha: 'def456',
+          message: 'fix: some bugfix',
+          files: [],
+        },
+        {
+          sha: 'abc123',
+          message: 'chore: release 3.0.0',
+          files: [],
+          pullRequest: {
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            number: 123,
+            title: 'chore: release 3.0.0',
+            body: '',
+            labels: [],
+            files: [],
+            sha: 'abc123',
+          },
+        },
+      ]);
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          '.': {
+            releaseType: 'simple',
+          },
+        },
+        {
+          // manifest file on the branch still refers to the previous release
+          '.': Version.parse('2.8.0'),
+        }
+      );
+      const pullRequests = await manifest.buildPullRequests();
+      expect(pullRequests).lengthOf(1);
+      const pullRequest = pullRequests[0];
+      expect(pullRequest.version?.toString()).to.eql('3.0.1');
+    });
+
     it('should handle mixing componentless configs', async () => {
       mockReleases(sandbox, github, [
         {

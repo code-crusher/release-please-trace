@@ -574,7 +574,10 @@ export class Manifest {
           );
           continue;
         }
-        if (expectedVersion.toString() === tagName.version.toString()) {
+        // The version in the manifest can be stale, e.g. it has not
+        // been updated yet to reflect the latest release. If the found
+        // release is newer, use it as the latest release (#2938).
+        if (tagName.version.compare(expectedVersion) >= 0) {
           this.logger.debug(
             `Found release for path ${path}, ${release.tagName}`
           );
