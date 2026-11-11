@@ -566,6 +566,10 @@ export class Manifest {
         );
         continue;
       }
+      // Paths sharing a component (e.g. Go v2 subdirectories) are only
+      // attributed releases whose version matches their manifest version,
+      // so that a release for one path is not mistaken for a release of
+      // another.
       for (const path of paths) {
         const expectedVersion = this.releasedVersions[path];
         if (!expectedVersion) {
@@ -574,10 +578,23 @@ export class Manifest {
           );
           continue;
         }
-        // The version in the manifest can be stale, e.g. it has not
-        // been updated yet to reflect the latest release. If the found
-        // release is newer, use it as the latest release (#2938).
-        if (tagName.version.compare(expectedVersion) >= 0) {
+        // The manifest can also be stale, e.g. when a release was tagged
+        // manually or the release commit has not landed on the branch
+        // yet. If this component maps to a single path, a release newer
+        // than the manifest version is still the latest release for that
+        // path (#2938). A manifest version of 0.0.0 means the path has
+        // not been released yet, so it does not adopt an existing
+        // release. Releases are iterated newest first, so only adopt the
+        // first (newest) matching release.
+        const isStaleManifestRelease =
+          paths.length === 1 &&
+          expectedVersion.toString() !== '0.0.0' &&
+          !releasesByPath[path] &&
+          tagName.version.compare(expectedVersion) > 0;
+        if (
+          expectedVersion.toString() === tagName.version.toString() ||
+          isStaleManifestRelease
+        ) {
           this.logger.debug(
             `Found release for path ${path}, ${release.tagName}`
           );
