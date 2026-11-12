@@ -121,6 +121,34 @@ describe('RubyYoshi', () => {
       assertHasUpdate(updates, 'lib/google/cloud/automl/version.rb', VersionRB);
     });
 
+    it('renders release notes with a previous release', async () => {
+      const strategy = new RubyYoshi({
+        targetBranch: 'main',
+        github,
+        component: 'google-cloud-automl',
+      });
+      const latestRelease = {
+        tag: new TagName(Version.parse('0.123.4'), 'google-cloud-automl'),
+        sha: 'abc123',
+        notes: 'some notes',
+      };
+      const pullRequest = await strategy.buildReleasePullRequest(
+        COMMITS,
+        latestRelease
+      );
+      const {updater} = assertHasUpdate(
+        pullRequest!.updates,
+        'CHANGELOG.md',
+        Changelog
+      );
+      expect((updater as Changelog).changelogEntry).to.match(
+        /^### 0\.123\.5 \/ \d{4}-\d{2}-\d{2}$/m
+      );
+      expect((updater as Changelog).changelogEntry).to.include(
+        '* update dependency com.google.cloud:google-cloud-storage to v1.120.0 ([#1234](https://github.com/googleapis/ruby-test-repo/issues/1234))'
+      );
+      safeSnapshot((updater as Changelog).changelogEntry);
+    });
     it('does not add summary to changelog', async () => {
       const strategy = new RubyYoshi({
         targetBranch: 'main',

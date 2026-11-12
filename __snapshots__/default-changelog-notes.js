@@ -218,6 +218,15 @@ exports['DefaultChangelogNotes buildNotes with commit parsing should handle mult
 * upgrade to Node 7 ([8916be7](https://github.com/googleapis/java-asset/commit/8916be74596394c27516696b957fd0d7))
 `
 
+exports['DefaultChangelogNotes buildNotes with commit parsing should hide sections marked as hidden 1'] = `
+## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
+
+
+### Features
+
+* some feature ([81228f3](https://github.com/googleapis/java-asset/commit/81228f3507ad6f742242474628ff58b2))
+`
+
 exports['DefaultChangelogNotes buildNotes with commit parsing should include commit authors when enabled with username 1'] = `
 ## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
 
@@ -256,6 +265,15 @@ exports['DefaultChangelogNotes buildNotes with commit parsing should not include
 ### Miscellaneous Chores
 
 * upgrade to Node 7 ([66925b0](https://github.com/googleapis/java-asset/commit/66925b06f59fc4fdd3031c498e1b0098))
+`
+
+exports['DefaultChangelogNotes buildNotes with commit parsing should not link non-numeric issue references 1'] = `
+## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
+
+
+### Bug Fixes
+
+* some bugfix (#abc) ([a60bf86](https://github.com/googleapis/java-asset/commit/a60bf862857213f144deb72d2f802963))
 `
 
 exports['DefaultChangelogNotes buildNotes with commit parsing should parse multiple commit messages from a single commit 1'] = `

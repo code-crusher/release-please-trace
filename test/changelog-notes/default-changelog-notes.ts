@@ -264,6 +264,37 @@ describe('DefaultChangelogNotes', () => {
         expect(notes).to.is.string;
         safeSnapshot(notes);
       });
+      it('should hide sections marked as hidden', async () => {
+        const commits = [
+          buildMockCommit('chore: some chore'),
+          buildMockCommit('feat: some feature'),
+        ];
+        const changelogNotes = new DefaultChangelogNotes();
+        const notes = await changelogNotes.buildNotes(
+          parseConventionalCommits(commits),
+          {
+            ...notesOptions,
+            changelogSections: [
+              {type: 'feat', section: 'Features'},
+              {type: 'chore', section: 'Miscellaneous Chores', hidden: true},
+            ],
+          }
+        );
+        expect(notes).to.include('some feature');
+        expect(notes).to.not.include('some chore');
+        expect(notes).to.not.include('Miscellaneous Chores');
+        safeSnapshot(notes);
+      });
+      it('should not link non-numeric issue references', async () => {
+        const commits = [buildMockCommit('fix: some bugfix (#abc)')];
+        const changelogNotes = new DefaultChangelogNotes();
+        const notes = await changelogNotes.buildNotes(
+          parseConventionalCommits(commits),
+          notesOptions
+        );
+        expect(notes).to.not.include('issues/abc');
+        safeSnapshot(notes);
+      });
       it('should handle html tags', async () => {
         const commits = [
           buildMockCommit('feat: render all imagesets as <picture>'),
