@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {jsonStringify} from '../util/json-stringify';
+import detectIndent = require('detect-indent');
 import {DefaultUpdater} from './default';
+
+const DEFAULT_INDENT = '  ';
 
 export class ReleasePleaseManifest extends DefaultUpdater {
   updateContent(content: string): string {
@@ -21,10 +23,41 @@ export class ReleasePleaseManifest extends DefaultUpdater {
     for (const [path, version] of this.versionsMap!) {
       parsed[path] = version.toString();
     }
-    if (content) {
-      return jsonStringify(parsed, content);
-    } else {
-      return JSON.stringify(parsed, null, 2);
-    }
+    return stringifyManifest(parsed, content);
   }
+}
+
+/**
+ * Serialize the manifest, separating each entry with a blank line.
+ *
+ * The manifest holds one package per line, so concurrent pull requests that
+ * bump adjacent packages modify adjacent lines, which git cannot merge.
+ * Separating the entries with blank lines keeps neighboring versions on
+ * non-adjacent lines so those pull requests can be merged.
+ *
+ * @param {Record<string, string>} parsed The manifest contents
+ * @param {string} content The original content, used to preserve formatting
+ * @returns {string} The serialized manifest
+ */
+function stringifyManifest(
+  parsed: Record<string, string>,
+  content?: string
+): string {
+  const prefix = content ? content.slice(0, content.indexOf('{')) : '';
+  const suffix = content ? content.slice(content.lastIndexOf('}') + 1) : '';
+  const entries = Object.entries(parsed);
+  if (entries.length === 0) {
+    return `${prefix}{}${suffix}`;
+  }
+
+  // Keep the indentation style of the original manifest. Minified manifests
+  // are expanded so that the entries can be separated by blank lines.
+  const indent = content
+    ? detectIndent(content.trim()).indent || DEFAULT_INDENT
+    : DEFAULT_INDENT;
+  const lines = entries.map(
+    ([path, version]) =>
+      `${indent}${JSON.stringify(path)}: ${JSON.stringify(version)}`
+  );
+  return `${prefix}{\n${lines.join(',\n\n')}\n}${suffix}`;
 }

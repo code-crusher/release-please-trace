@@ -104,6 +104,25 @@ release-please will now use "1.1.1" as the last-released/current version for
 has found since the last merged release PR (or "bootstrap-sha" if this is the
 first run).
 
+### Merge conflicts
+
+release-please writes each package version on its own line, separated by a
+blank line:
+
+```js
+{
+  "path/to/pkg-a": "1.1.1",
+
+  "path/to/pkg-b": "2.0.0"
+}
+```
+
+The blank lines keep neighboring packages off adjacent lines so that concurrent
+release pull requests, which each bump a single package, can be merged by git
+without conflicts. When using `separate-pull-requests`, this avoids conflicts
+between pull requests that release adjacent packages. Manifests without the
+blank lines are reformatted the next time release-please updates them.
+
 ## Configfile
 
 Some example configs below illustrate usage (comments for illustration purposes
