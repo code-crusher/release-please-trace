@@ -189,6 +189,13 @@ defaults (those are documented in comments)
   // absence defaults to https://github.com
   "changelog-host": "https://example.com",
 
+  // Files relative to the repository root that, when changed, should be
+  // considered a change to every configured package. Useful for monorepos
+  // where a dependency shared by all packages is declared in a root-level
+  // file, e.g. `package-lock.json` or the root `package.json`.
+  // absence defaults to [] (i.e. no global files)
+  "global-files": ["package-lock.json", "package.json"],
+
   // include commit authors in changelog entries
   // when true, appends (@username) or author name to each entry
   // absence defaults to false
@@ -310,7 +317,10 @@ defaults (those are documented in comments)
       // overrides release-type for node
       "release-type": "node",
       // exclude commits from that path from processing
-      "exclude-paths": ["path/to/myPyPkgA"]
+      "exclude-paths": ["path/to/myPyPkgA"],
+      // files relative to the repository root that, when changed, should be
+      // considered a change to this package. See top-level note above.
+      "global-files": ["package-lock.json"]
     },
 
     // path segment should be a folder relative to repository root

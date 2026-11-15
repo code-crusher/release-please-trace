@@ -242,6 +242,13 @@
             "type": "string"
           }
         },
+        "global-files": {
+          "description": "Files relative to the repository root that, when changed, should be considered a change to every configured package. Useful for monorepos where a dependency shared by all packages is declared in a root-level file, e.g. `package-lock.json` or the root `package.json`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "version-file": {
           "description": "Path to the specialize version file. Used by `ruby` and `simple` strategies.",
           "type": "string"
@@ -508,6 +515,7 @@
     "skip-snapshot": true,
     "initial-version": true,
     "exclude-paths": true,
+    "global-files": true,
     "component-no-space": true
   }
 }

@@ -142,6 +142,7 @@ export interface ReleaserConfig {
   skipSnapshot?: boolean;
   // Manifest only
   excludePaths?: string[];
+  globalFiles?: string[];
 }
 
 export interface CandidateReleasePullRequest {
@@ -193,6 +194,7 @@ interface ReleaserConfigJson {
   'skip-snapshot'?: boolean; // Java-only
   'initial-version'?: string;
   'exclude-paths'?: string[]; // manifest-only
+  'global-files'?: string[]; // manifest-only
   'date-format'?: string;
 }
 
@@ -692,6 +694,7 @@ export class Manifest {
     const cs = new CommitSplit({
       includeEmpty: true,
       packagePaths: Object.keys(this.repositoryConfig),
+      globalFiles: this.getGlobalFiles(),
     });
     const splitCommits = cs.split(commits);
 
@@ -1345,6 +1348,23 @@ export class Manifest {
     };
   }
 
+  /**
+   * Collect the configured global files (e.g. `package-lock.json`).
+   * These are files at the repository root that, when changed, should be
+   * considered a change to every configured package (see
+   * https://github.com/googleapis/release-please/issues/1541).
+   * @returns {string[]} List of global file paths.
+   */
+  private getGlobalFiles(): string[] {
+    const globalFiles = new Set<string>();
+    for (const path in this.repositoryConfig) {
+      for (const file of this.repositoryConfig[path].globalFiles ?? []) {
+        globalFiles.add(file);
+      }
+    }
+    return Array.from(globalFiles);
+  }
+
   private async getStrategiesByPath(): Promise<Record<string, Strategy>> {
     if (!this._strategiesByPath) {
       this.logger.info('Building strategies by path');
@@ -1428,6 +1448,7 @@ function extractReleaserConfig(
     skipSnapshot: config['skip-snapshot'],
     initialVersion: config['initial-version'],
     excludePaths: config['exclude-paths'],
+    globalFiles: config['global-files'],
     dateFormat: config['date-format'],
   };
 }
@@ -1794,6 +1815,7 @@ function mergeReleaserConfig(
     initialVersion: pathConfig.initialVersion ?? defaultConfig.initialVersion,
     extraLabels: pathConfig.extraLabels ?? defaultConfig.extraLabels,
     excludePaths: pathConfig.excludePaths ?? defaultConfig.excludePaths,
+    globalFiles: pathConfig.globalFiles ?? defaultConfig.globalFiles,
     dateFormat: pathConfig.dateFormat ?? defaultConfig.dateFormat,
   };
 }

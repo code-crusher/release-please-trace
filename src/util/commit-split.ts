@@ -40,6 +40,12 @@ export interface CommitSplitOptions {
   // NOTE: GitHub API always returns paths using the `/` separator, regardless
   // of what platform the client code is running on
   packagePaths?: string[];
+  // Files (relative to the repository root) that, when changed, should be
+  // considered a change to every configured package. This is useful for
+  // monorepos where a dependency shared by all packages is declared in a
+  // single root-level file, e.g. `package-lock.json` or the root
+  // `package.json` (see https://github.com/googleapis/release-please/issues/1541).
+  globalFiles?: string[];
 }
 
 /**
@@ -51,6 +57,7 @@ export interface CommitSplitOptions {
 export class CommitSplit {
   includeEmpty: boolean;
   packagePaths?: string[];
+  globalFiles?: string[];
   constructor(opts?: CommitSplitOptions) {
     opts = opts || {};
     this.includeEmpty = !!opts.includeEmpty;
@@ -63,6 +70,9 @@ export class CommitSplit {
           return path !== ROOT_PROJECT_PATH;
         })
         .sort((a, b) => b.length - a.length); // sort by longest paths first
+    }
+    if (opts.globalFiles) {
+      this.globalFiles = normalizePaths(opts.globalFiles);
     }
   }
 
@@ -115,6 +125,32 @@ export class CommitSplit {
         } else {
           for (const pkgName in splitCommits) {
             splitCommits[pkgName].push(commit);
+          }
+        }
+      }
+      if (this.globalFiles) {
+        const touchedGlobalFile = commit.files.some(file =>
+          this.globalFiles!.includes(file)
+        );
+        if (touchedGlobalFile) {
+          // A commit that changes a global file (e.g. a root-level
+          // package-lock.json or package.json) is considered a change to
+          // every configured package.
+          if (this.packagePaths) {
+            for (const pkgName of this.packagePaths) {
+              if (!dedupe.has(pkgName)) {
+                dedupe.add(pkgName);
+                splitCommits[pkgName] = splitCommits[pkgName] || [];
+                splitCommits[pkgName].push(commit);
+              }
+            }
+          } else {
+            for (const pkgName in splitCommits) {
+              if (!dedupe.has(pkgName)) {
+                dedupe.add(pkgName);
+                splitCommits[pkgName].push(commit);
+              }
+            }
           }
         }
       }

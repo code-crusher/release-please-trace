@@ -76,6 +76,50 @@ describe('CommitSplit', () => {
     expect(splitCommits['core']).lengthOf(1);
     expect(splitCommits['core/subpackage']).lengthOf(1);
   });
+  describe('global files', () => {
+    const globalCommits: Commit[] = [
+      {
+        sha: 'abc123',
+        message: 'chore(deps): bump lodash',
+        files: ['package-lock.json'],
+      },
+      {
+        sha: 'def234',
+        message: 'chore: bump typescript',
+        files: ['package.json'],
+      },
+      {
+        sha: 'efg',
+        message: 'touches package',
+        files: ['pkg1/foo.txt'],
+      },
+    ];
+    it('assigns commits touching a global file to all package paths', () => {
+      const commitSplit = new CommitSplit({
+        packagePaths: ['pkg1', 'pkg2'],
+        globalFiles: ['package-lock.json', 'package.json'],
+      });
+      const splitCommits = commitSplit.split(globalCommits);
+      expect(splitCommits['pkg1']).lengthOf(3);
+      expect(splitCommits['pkg2']).lengthOf(2);
+    });
+    it('does not assign global file commits when none are configured', () => {
+      const commitSplit = new CommitSplit({
+        packagePaths: ['pkg1', 'pkg2'],
+      });
+      const splitCommits = commitSplit.split(globalCommits);
+      expect(splitCommits['pkg1']).lengthOf(1);
+      expect(splitCommits['pkg2']).to.be.undefined;
+    });
+    it('assigns global file commits to existing split keys when no package paths configured', () => {
+      const commitSplit = new CommitSplit({
+        globalFiles: ['package-lock.json'],
+      });
+      const splitCommits = commitSplit.split(globalCommits);
+      expect(splitCommits['pkg1']).lengthOf(1);
+    });
+  });
+
   describe('including empty commits', () => {
     it('should separate commits', () => {
       const commitSplit = new CommitSplit({

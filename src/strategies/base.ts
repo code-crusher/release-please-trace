@@ -89,6 +89,11 @@ export interface BaseStrategyOptions {
   extraLabels?: string[];
   dateFormat?: string;
   includeCommitAuthors?: boolean;
+  // Files (relative to the repository root) that, when changed, should
+  // trigger a release even if the commits do not contain user-facing
+  // changes, e.g. a root-level `package-lock.json` (see
+  // https://github.com/googleapis/release-please/issues/1541).
+  globalFiles?: string[];
 }
 
 /**
@@ -122,6 +127,7 @@ export abstract class BaseStrategy implements Strategy {
   readonly extraLabels: string[];
   protected dateFormat: string;
   protected includeCommitAuthors?: boolean;
+  readonly globalFiles: string[];
 
   readonly changelogNotes: ChangelogNotes;
 
@@ -161,6 +167,7 @@ export abstract class BaseStrategy implements Strategy {
     this.extraLabels = options.extraLabels || [];
     this.dateFormat = options.dateFormat || DEFAULT_DATE_FORMAT;
     this.includeCommitAuthors = options.includeCommitAuthors;
+    this.globalFiles = options.globalFiles || [];
   }
 
   /**
@@ -321,7 +328,7 @@ export abstract class BaseStrategy implements Strategy {
     const branchName = branchComponent
       ? BranchName.ofComponentTargetBranch(branchComponent, this.targetBranch)
       : BranchName.ofTargetBranch(this.targetBranch);
-    const releaseNotesBody = await this.buildReleaseNotes(
+    let releaseNotesBody = await this.buildReleaseNotes(
       conventionalCommits,
       newVersion,
       newVersionTag,
@@ -329,12 +336,27 @@ export abstract class BaseStrategy implements Strategy {
       commits
     );
     if (!bumpOnlyOptions && this.changelogEmpty(releaseNotesBody)) {
-      this.logger.info(
-        `No user facing commits found since ${
-          latestRelease ? latestRelease.sha : 'beginning of time'
-        } - skipping`
+      // If a commit touched a configured global file (e.g. a root-level
+      // package-lock.json), we still want to open a release so that a
+      // dependency update that affects this package is released
+      // (see https://github.com/googleapis/release-please/issues/1541).
+      const globalFileCommits = conventionalCommits.filter(conventionalCommit =>
+        conventionalCommit.files?.some(file => this.isGlobalFile(file))
       );
-      return undefined;
+      if (globalFileCommits.length === 0) {
+        this.logger.info(
+          `No user facing commits found since ${
+            latestRelease ? latestRelease.sha : 'beginning of time'
+          } - skipping`
+        );
+        return undefined;
+      }
+      // these commits are typically `chore(deps)`/`build(deps)` dependency
+      // updates that the changelog preset hides; surface them under a
+      // "Dependencies" section so the release pull request is not empty.
+      releaseNotesBody = `### Dependencies\n\n${globalFileCommits
+        .map(conventionalCommit => `* ${conventionalCommit.bareMessage}`)
+        .join('\n')}`;
     }
     const updates = await this.buildUpdates({
       changelogEntry: releaseNotesBody,
@@ -372,6 +394,18 @@ export abstract class BaseStrategy implements Strategy {
       version: newVersion,
       draft: draft ?? false,
     };
+  }
+
+  /**
+   * Determine if a file path (as returned by the GitHub API, relative to
+   * the repository root) matches one of the configured global files.
+   * @param {string} file The file path relative to the repository root.
+   * @returns {boolean} Whether the file is a configured global file.
+   */
+  private isGlobalFile(file: string): boolean {
+    return this.globalFiles.some(
+      globalFile => file === globalFile || file === `/${globalFile}`
+    );
   }
 
   // Helper to convert extra files with globs to the file paths to add

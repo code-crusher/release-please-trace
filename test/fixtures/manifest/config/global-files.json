@@ -1,0 +1,13 @@
+{
+  "release-type": "simple",
+  "global-files": ["package-lock.json"],
+  "packages": {
+    ".": {
+      "component": "root"
+    },
+    "node-lib": {
+      "component": "node-lib",
+      "global-files": ["package.json"]
+    }
+  }
+}

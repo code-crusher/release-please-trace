@@ -29,6 +29,7 @@ import {
   mockTags,
   assertNoHasUpdate,
   mockReleaseData,
+  buildMockCommit,
 } from './helpers';
 import {expect} from 'chai';
 import * as assert from 'assert';
@@ -535,6 +536,37 @@ describe('Manifest', () => {
       ]);
       expect(manifest.repositoryConfig['node-lib'].excludePaths).to.deep.equal([
         'path-ignore',
+      ]);
+    });
+    it('should read global files from manifest', async () => {
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('release-please-config.json', 'main')
+        .resolves(
+          buildGitHubFileContent(
+            fixturesPath,
+            'manifest/config/global-files.json'
+          )
+        )
+        .withArgs('.release-please-manifest.json', 'main')
+        .resolves(
+          buildGitHubFileContent(
+            fixturesPath,
+            'manifest/versions/versions.json'
+          )
+        );
+      const manifest = await Manifest.fromManifest(
+        github,
+        github.repository.defaultBranch
+      );
+      expect(manifest.repositoryConfig['.'].globalFiles).to.deep.equal([
+        'package-lock.json',
+      ]);
+      expect(manifest.repositoryConfig['node-lib'].globalFiles).to.deep.equal([
+        'package.json',
       ]);
     });
     it('should build simple plugins from manifest', async () => {
@@ -3934,6 +3966,161 @@ describe('Manifest', () => {
         expect(mainPullRequest.headRefName).to.eql(
           'release-please--branches--main--components--d'
         );
+      });
+    });
+
+    describe('global-files', () => {
+      beforeEach(() => {
+        mockReleases(sandbox, github, []);
+        mockTags(sandbox, github, []);
+      });
+      it('should create releases for all packages when a root package-lock.json changes', async () => {
+        mockCommits(sandbox, github, [
+          buildMockCommit('chore(deps): bump lodash from 4.17.20 to 4.17.21', [
+            'package-lock.json',
+          ]),
+        ]);
+        const stub = sandbox.stub(github, 'getFileContentsOnBranch');
+        stub.withArgs('node1/package.json', 'main').resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({
+              name: '@here/pkgA',
+              version: '1.0.0',
+              dependencies: {lodash: '^4.17.21'},
+            })
+          )
+        );
+        stub.withArgs('node2/package.json', 'main').resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({
+              name: '@here/pkgB',
+              version: '2.0.0',
+              dependencies: {lodash: '^4.17.21'},
+            })
+          )
+        );
+        stub.rejects(Object.assign(Error('not found'), {status: 404}));
+        const manifest = new Manifest(
+          github,
+          'main',
+          {
+            node1: {
+              releaseType: 'node',
+              globalFiles: ['package-lock.json'],
+            },
+            node2: {
+              releaseType: 'node',
+              globalFiles: ['package-lock.json'],
+            },
+          },
+          {
+            node1: Version.parse('1.0.0'),
+            node2: Version.parse('2.0.0'),
+          },
+          {
+            manifestPath: '.release-please-manifest.json',
+            plugins: ['node-workspace'],
+          }
+        );
+        const pullRequests = await manifest.buildPullRequests();
+        expect(pullRequests).lengthOf(1);
+        const pullRequest = pullRequests[0];
+        expect(pullRequest.body.toString()).to.include('pkgA: 1.0.1');
+        expect(pullRequest.body.toString()).to.include('pkgB: 2.0.1');
+        expect(pullRequest.body.toString()).to.include('### Dependencies');
+      });
+
+      it('should not create releases when a root package-lock.json changes and global-files is not configured', async () => {
+        mockCommits(sandbox, github, [
+          buildMockCommit('chore(deps): bump lodash from 4.17.20 to 4.17.21', [
+            'package-lock.json',
+          ]),
+        ]);
+        const stub = sandbox.stub(github, 'getFileContentsOnBranch');
+        stub.withArgs('node1/package.json', 'main').resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({
+              name: '@here/pkgA',
+              version: '1.0.0',
+              dependencies: {lodash: '^4.17.21'},
+            })
+          )
+        );
+        stub.rejects(Object.assign(Error('not found'), {status: 404}));
+        const manifest = new Manifest(
+          github,
+          'main',
+          {
+            node1: {
+              releaseType: 'node',
+            },
+          },
+          {
+            node1: Version.parse('1.0.0'),
+          },
+          {
+            manifestPath: '.release-please-manifest.json',
+            plugins: ['node-workspace'],
+          }
+        );
+        const pullRequests = await manifest.buildPullRequests();
+        expect(pullRequests).lengthOf(0);
+      });
+
+      it('should create a release when a root package.json changes and global-files is configured', async () => {
+        mockCommits(sandbox, github, [
+          buildMockCommit('chore(deps): bump typescript from 4.0.0 to 5.0.0', [
+            'package.json',
+          ]),
+        ]);
+        const stub = sandbox.stub(github, 'getFileContentsOnBranch');
+        stub.withArgs('node1/package.json', 'main').resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({
+              name: '@here/pkgA',
+              version: '1.0.0',
+              dependencies: {lodash: '^4.17.21'},
+            })
+          )
+        );
+        stub.rejects(Object.assign(Error('not found'), {status: 404}));
+        const manifest = new Manifest(
+          github,
+          'main',
+          {
+            node1: {
+              releaseType: 'node',
+              globalFiles: ['package.json'],
+            },
+          },
+          {
+            node1: Version.parse('1.0.0'),
+          },
+          {
+            manifestPath: '.release-please-manifest.json',
+            plugins: ['node-workspace'],
+          }
+        );
+        const pullRequests = await manifest.buildPullRequests();
+        expect(pullRequests).lengthOf(1);
+        const pullRequest = pullRequests[0];
+        expect(pullRequest.body.toString()).to.include('### Dependencies');
+        expect(pullRequest.body.toString()).to.include(
+          'bump typescript from 4.0.0 to 5.0.0'
+        );
+        // the package should be patch bumped
+        const packageJsonUpdate = assertHasUpdate(
+          pullRequest.updates,
+          'node1/package.json'
+        );
+        const updatedContent = packageJsonUpdate.updater.updateContent(
+          JSON.stringify({
+            name: '@here/pkgA',
+            version: '1.0.0',
+            dependencies: {lodash: '^4.17.21'},
+          })
+        );
+        expect(JSON.parse(updatedContent).version).to.eql('1.0.1');
       });
     });
   });
