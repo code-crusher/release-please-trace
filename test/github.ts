@@ -1085,15 +1085,14 @@ describe('GitHub', () => {
       expect(changes).to.not.be.undefined;
       expect(changes!.size).to.eql(1);
       const updatedContent = changes!.get(manifestPath)!.content;
-      // Entries are separated by a blank line so that concurrent release pull
-      // requests that bump adjacent entries can be merged.
-      const expectedContent = [
-        '{',
-        '  "path1": "1.1.0",',
-        '',
-        '  "path2": "2.0.0"',
-        '}',
-      ].join('\n');
+      const expectedContent = JSON.stringify(
+        {
+          path1: '1.1.0',
+          path2: '2.0.0',
+        },
+        null,
+        2
+      );
       expect(updatedContent).to.eql(expectedContent);
     });
   });

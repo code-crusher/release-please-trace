@@ -220,6 +220,7 @@ export interface ManifestOptions {
   commitBatchSize?: number;
   logger?: Logger;
   dateFormat?: string;
+  separateManifestEntries?: boolean;
 }
 
 export interface ReleaserPackageConfig extends ReleaserConfigJson {
@@ -276,6 +277,7 @@ export interface ManifestConfig extends ReleaserConfigJson {
   'commit-batch-size'?: number;
   'sequential-calls'?: boolean;
   'always-update'?: boolean;
+  'separate-manifest-entries'?: boolean;
 }
 // path => version
 export type ReleasedVersions = Record<string, Version>;
@@ -334,6 +336,7 @@ export class Manifest {
   readonly releaseSearchDepth: number;
   readonly commitSearchDepth: number;
   readonly commitBatchSize: number;
+  readonly separateManifestEntries: boolean;
   readonly logger: Logger;
   private pullRequestOverflowHandler: PullRequestOverflowHandler;
 
@@ -405,6 +408,8 @@ export class Manifest {
       manifestOptions?.commitSearchDepth || DEFAULT_COMMIT_SEARCH_DEPTH;
     this.commitBatchSize =
       manifestOptions?.commitBatchSize || DEFAULT_COMMIT_BATCH_SIZE;
+    this.separateManifestEntries =
+      manifestOptions?.separateManifestEntries || false;
     this.logger = manifestOptions?.logger ?? defaultLogger;
     this.plugins = (manifestOptions?.plugins || []).map(pluginType =>
       buildPlugin({
@@ -414,6 +419,7 @@ export class Manifest {
         repositoryConfig: this.repositoryConfig,
         manifestPath: this.manifestPath,
         separatePullRequests: this.separatePullRequests,
+        separateManifestEntries: this.separateManifestEntries,
       })
     );
     this.pullRequestOverflowHandler = new FilePullRequestOverflowHandler(
@@ -789,6 +795,7 @@ export class Manifest {
             updater: new ReleasePleaseManifest({
               version: releasePullRequest.version,
               versionsMap,
+              separateEntries: this.separateManifestEntries,
             }),
           });
         }
@@ -1482,6 +1489,7 @@ async function parseConfig(
     releaseSearchDepth: config['release-search-depth'],
     commitSearchDepth: config['commit-search-depth'],
     commitBatchSize: config['commit-batch-size'],
+    separateManifestEntries: config['separate-manifest-entries'],
     sequentialCalls: config['sequential-calls'],
   };
   return {config: repositoryConfig, options: manifestOptions};

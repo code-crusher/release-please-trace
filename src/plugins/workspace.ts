@@ -35,6 +35,7 @@ export interface WorkspacePluginOptions {
   manifestPath?: string;
   updateAllPackages?: boolean;
   merge?: boolean;
+  separateManifestEntries?: boolean;
   logger?: Logger;
 }
 
@@ -58,6 +59,7 @@ export abstract class WorkspacePlugin<T> extends ManifestPlugin {
   private updateAllPackages: boolean;
   private manifestPath: string;
   private merge: boolean;
+  private separateManifestEntries: boolean;
   constructor(
     github: Scm,
     targetBranch: string,
@@ -68,6 +70,7 @@ export abstract class WorkspacePlugin<T> extends ManifestPlugin {
     this.manifestPath = options.manifestPath ?? DEFAULT_RELEASE_PLEASE_MANIFEST;
     this.updateAllPackages = options.updateAllPackages ?? false;
     this.merge = options.merge ?? true;
+    this.separateManifestEntries = options.separateManifestEntries ?? false;
   }
   async run(
     candidates: CandidateReleasePullRequest[]
@@ -183,6 +186,7 @@ export abstract class WorkspacePlugin<T> extends ManifestPlugin {
       updater: new ReleasePleaseManifest({
         version: newCandidates[0].pullRequest.version!,
         versionsMap: updatedPathVersions,
+        separateEntries: this.separateManifestEntries,
       }),
     });
 

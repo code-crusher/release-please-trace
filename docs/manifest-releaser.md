@@ -106,8 +106,12 @@ first run).
 
 ### Merge conflicts
 
-release-please writes each package version on its own line, separated by a
-blank line:
+By default release-please writes one package version per line with no blank
+lines between them. Two pull requests that bump packages adjacent in the file
+therefore modify adjacent lines, which git cannot merge. This is common when
+using `separate-pull-requests` and releasing several packages in succession.
+
+Set `"separate-manifest-entries": true` to insert a blank line between entries:
 
 ```js
 {
@@ -118,10 +122,8 @@ blank line:
 ```
 
 The blank lines keep neighboring packages off adjacent lines so that concurrent
-release pull requests, which each bump a single package, can be merged by git
-without conflicts. When using `separate-pull-requests`, this avoids conflicts
-between pull requests that release adjacent packages. Manifests without the
-blank lines are reformatted the next time release-please updates them.
+release pull requests can be merged without conflicts. This option defaults to
+`false`, preserving the existing manifest format.
 
 ## Configfile
 
@@ -305,6 +307,12 @@ defaults (those are documented in comments)
   // large numbers of packages at once.
   // absence defaults to false, causing calls to be issued concurrently.
   "sequential-calls": false,
+
+  // insert a blank line between entries in the manifest file so that
+  // concurrent release pull requests that bump adjacent packages can be
+  // merged without conflicts. See "Merge conflicts" above.
+  // absence defaults to false, preserving the existing manifest format.
+  "separate-manifest-entries": false,
 
 
   // per package configuration: at least one entry required.

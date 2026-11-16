@@ -1,0 +1,6 @@
+{
+  "separate-manifest-entries": true,
+  "packages": {
+    "path/to/pkg": {}
+  }
+}

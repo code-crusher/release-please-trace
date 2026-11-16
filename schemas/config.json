@@ -443,6 +443,10 @@
           "description": "Whether to open pull requests/releases sequentially rather than concurrently. If you have many components, you may want to set this to avoid secondary rate limits.",
           "type": "boolean"
         },
+        "separate-manifest-entries": {
+          "description": "Insert a blank line between entries in the manifest file. This keeps neighboring packages off adjacent lines so that concurrent release pull requests, which each bump a single package, can be merged without conflicts. Defaults to `false`.",
+          "type": "boolean"
+        },
         "label": {
           "description": "Comma-separated list of labels to add to newly opened pull request. These are used to identify release pull requests.",
           "type": "string"
@@ -472,6 +476,7 @@
     "commit-search-depth": true,
     "commit-batch-size": true,
     "sequential-calls": true,
+    "separate-manifest-entries": true,
     "release-type": true,
     "bump-minor-pre-major": true,
     "bump-patch-for-minor-pre-major": true,

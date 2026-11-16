@@ -13,15 +13,35 @@
 // limitations under the License.
 
 import detectIndent = require('detect-indent');
+import {jsonStringify} from '../util/json-stringify';
+import {UpdateOptions} from './default';
 import {DefaultUpdater} from './default';
 
 const DEFAULT_INDENT = '  ';
 
+export interface ReleasePleaseManifestOptions extends UpdateOptions {
+  // Insert a blank line between entries. This keeps neighboring versions on
+  // non-adjacent lines so that concurrent pull requests that bump adjacent
+  // packages can be merged without conflicts.
+  separateEntries?: boolean;
+}
+
 export class ReleasePleaseManifest extends DefaultUpdater {
+  separateEntries: boolean;
+  constructor(options: ReleasePleaseManifestOptions) {
+    super(options);
+    this.separateEntries = options.separateEntries ?? false;
+  }
+
   updateContent(content: string): string {
     const parsed: Record<string, string> = content ? JSON.parse(content) : {};
     for (const [path, version] of this.versionsMap!) {
       parsed[path] = version.toString();
+    }
+    if (!this.separateEntries) {
+      return content
+        ? jsonStringify(parsed, content)
+        : JSON.stringify(parsed, null, 2);
     }
     return stringifyManifest(parsed, content);
   }

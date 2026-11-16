@@ -39,6 +39,7 @@ export interface PluginFactoryOptions {
   repositoryConfig: RepositoryConfig;
   manifestPath: string;
   separatePullRequests?: boolean;
+  separateManifestEntries?: boolean;
 
   // node options
   alwaysLinkLocal?: boolean;
