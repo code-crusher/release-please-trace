@@ -35,6 +35,7 @@ public final class Version {
   // {x-release-please-start-major}
   public static String MAJOR = "2";
   public static String MAJOR_V = "v2";
+  public static String MODULE_PATH = "github.com/user2/repo/v2";
   // {x-release-please-end}
 
   // {x-release-please-start-minor}

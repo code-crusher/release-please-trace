@@ -18,7 +18,7 @@ import {logger as defaultLogger, Logger} from '../util/logger';
 
 const VERSION_REGEX =
   /(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)(-(?<preRelease>[\w.]+))?(\+(?<build>[-\w.]+))?/;
-const MAJOR_VERSION_REGEX = /\d+\b/;
+const MAJOR_VERSION_REGEX = /\b(v?)(\d+)\b/;
 const SINGLE_VERSION_REGEX = /\b\d+\b/;
 const INLINE_UPDATE_REGEX =
   /x-release-please-(?<scope>major|minor|patch|version-date|version|date)/;
@@ -135,7 +135,9 @@ export class Generic extends DefaultUpdater {
           newLines.push(line.replace(VERSION_REGEX, version.toString()));
           return;
         case 'major':
-          newLines.push(line.replace(MAJOR_VERSION_REGEX, `${version.major}`));
+          newLines.push(
+            line.replace(MAJOR_VERSION_REGEX, `$1${version.major}`)
+          );
           return;
         case 'minor':
           newLines.push(line.replace(SINGLE_VERSION_REGEX, `${version.minor}`));
