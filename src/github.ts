@@ -42,6 +42,7 @@ import {
 } from '@google-automations/git-file-utils';
 import {Logger} from './util/code-suggester/types';
 import {mergeUpdates} from './updaters/composite';
+import {CommitSorter} from './util/commit-order';
 import {
   Scm,
   ScmChangeSet,
@@ -85,6 +86,11 @@ interface GraphQLCommit {
   sha: string;
   message: string;
   author?: GraphQLCommitAuthor;
+  parents?: {
+    nodes: {
+      oid: string;
+    }[];
+  };
   associatedPullRequests: {
     nodes: GraphQLPullRequest[];
   };
@@ -115,11 +121,13 @@ interface GraphQLPullRequest {
 }
 
 interface CommitHistory {
-  pageInfo: {
+  pageInfo?: {
     hasNextPage: boolean;
     endCursor: string | undefined;
   };
   data: Commit[];
+  // sha => parent shas, used to order the commits topologically
+  parents: Record<string, string[]>;
 }
 
 type CommitIteratorOptions = ScmCommitIteratorOptions;
@@ -217,7 +225,23 @@ export class GitHub implements Scm {
     const maxResults = options.maxResults ?? Number.MAX_SAFE_INTEGER;
     let cursor: string | undefined = undefined;
     let results = 0;
-    while (results < maxResults) {
+    // The GitHub API returns commits in commit date order, which is not a
+    // topological order: commits from a branch merged without rebasing keep
+    // their original dates and can be listed after commits that were merged
+    // later. Re-order them so that callers that stop at a given commit (e.g.
+    // the last release) do not skip those commits. See #1533.
+    const sorter = new CommitSorter();
+    let exhausted = false;
+    while (results < maxResults && !exhausted) {
+      // Drain whatever can be yielded before fetching the next page.
+      let commit: Commit | undefined;
+      while ((commit = sorter.next())) {
+        results += 1;
+        yield commit;
+        if (results >= maxResults) {
+          return;
+        }
+      }
       const response: CommitHistory | null = await this.mergeCommitsGraphQL(
         targetBranch,
         cursor,
@@ -227,14 +251,26 @@ export class GitHub implements Scm {
       if (!response) {
         break;
       }
-      for (let i = 0; i < response.data.length; i++) {
-        results += 1;
-        yield response.data[i];
+      sorter.add(response.data, c => response.parents[c.sha]);
+      if (!response.pageInfo?.hasNextPage) {
+        exhausted = true;
+      } else {
+        cursor = response.pageInfo.endCursor;
       }
-      if (!response.pageInfo.hasNextPage) {
+    }
+    // Yield whatever the sorter can now emit, including commits from the last
+    // page.
+    let commit: Commit | undefined;
+    while (results < maxResults && (commit = sorter.next())) {
+      results += 1;
+      yield commit;
+    }
+    for (const commit of sorter.flush()) {
+      if (results >= maxResults) {
         break;
       }
-      cursor = response.pageInfo.endCursor;
+      results += 1;
+      yield commit;
     }
   }
 
@@ -281,6 +317,11 @@ export class GitHub implements Scm {
                   }
                   sha: oid
                   message
+                  parents(first: 2) {
+                    nodes {
+                      oid
+                    }
+                  }
                   author {
                     name
                     email
@@ -342,7 +383,16 @@ export class GitHub implements Scm {
       }
     }
     const commitData: Commit[] = [];
+    const parents: Record<string, string[]> = {};
     for (const graphCommit of commits) {
+      // Only record parents when the API provided them. Older/mocked
+      // responses may omit the field entirely, in which case the commits are
+      // left in the order they were returned.
+      if (graphCommit.parents) {
+        parents[graphCommit.sha] = graphCommit.parents.nodes.map(
+          node => node.oid
+        );
+      }
       const commit: Commit = {
         sha: graphCommit.sha,
         message: graphCommit.message,
@@ -412,6 +462,7 @@ export class GitHub implements Scm {
     return {
       pageInfo: history.pageInfo,
       data: commitData,
+      parents,
     };
   }
 

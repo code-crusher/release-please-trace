@@ -606,6 +606,61 @@ describe('GitHub', () => {
       snapshot(commits!);
       req.done();
     });
+
+    it('orders commits topologically', async () => {
+      // GitHub returns commits in commit date order. The commits of a branch
+      // merged without rebasing keep their older dates, so they are listed
+      // after the release commit even though they were merged after it. See
+      // #1533.
+      const graphql = JSON.parse(
+        readFileSync(
+          resolve(fixturesPath, 'commits-since-out-of-order.json'),
+          'utf8'
+        )
+      );
+      req.post('/graphql').reply(200, {
+        data: graphql,
+      });
+      const generator = github.mergeCommitIterator('main');
+      const commits: Commit[] = [];
+      for await (const commit of generator) {
+        commits.push(commit);
+      }
+      expect(commits.map(commit => commit.message)).to.eql([
+        'Merge pull request #3 from feature-foo',
+        'feat: foo commit 2',
+        'feat: foo commit 1',
+        'chore: release 1.0.0',
+        'Merge pull request #2 from feature-bar',
+        'feat: bar commit',
+        'chore: initial commit',
+      ]);
+      req.done();
+    });
+
+    it('does not lose commits merged after the last release', async () => {
+      const graphql = JSON.parse(
+        readFileSync(
+          resolve(fixturesPath, 'commits-since-out-of-order.json'),
+          'utf8'
+        )
+      );
+      req.post('/graphql').reply(200, {
+        data: graphql,
+      });
+      // Stop at the release commit, as the manifest does when it has seen all
+      // of the latest releases.
+      const commits = await github.commitsSince(
+        'main',
+        commit => commit.sha === '0000000000000000000000000000000000000006'
+      );
+      expect(commits.map(commit => commit.message)).to.eql([
+        'Merge pull request #3 from feature-foo',
+        'feat: foo commit 2',
+        'feat: foo commit 1',
+      ]);
+      req.done();
+    });
   });
 
   describe('getCommitFiles', () => {

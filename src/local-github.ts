@@ -567,7 +567,11 @@ export class LocalGitHub implements Scm {
     }
 
     const ref = await this.ensureRef(targetBranch);
-    const args = ['log', ref, `--pretty=format:${format}`];
+    // `git log` defaults to commit date order, which can list the commits of a
+    // branch that was merged without rebasing after commits merged later (such
+    // as the last release commit). Use topological order so callers that stop
+    // at a given commit do not skip them. See #1533.
+    const args = ['log', '--topo-order', ref, `--pretty=format:${format}`];
     if (backfillFiles) {
       args.push('--name-only');
     }

@@ -1,0 +1,76 @@
+{
+  "repository": {
+    "ref": {
+      "target": {
+        "history": {
+          "nodes": [
+            {
+              "sha": "0000000000000000000000000000000000000008",
+              "message": "Merge pull request #3 from feature-foo",
+              "parents": {
+                "nodes": [
+                  {"oid": "0000000000000000000000000000000000000006"},
+                  {"oid": "0000000000000000000000000000000000000004"}
+                ]
+              },
+              "associatedPullRequests": {"nodes": []}
+            },
+            {
+              "sha": "0000000000000000000000000000000000000006",
+              "message": "chore: release 1.0.0",
+              "parents": {
+                "nodes": [{"oid": "0000000000000000000000000000000000000005"}]
+              },
+              "associatedPullRequests": {"nodes": []}
+            },
+            {
+              "sha": "0000000000000000000000000000000000000005",
+              "message": "Merge pull request #2 from feature-bar",
+              "parents": {
+                "nodes": [
+                  {"oid": "0000000000000000000000000000000000000001"},
+                  {"oid": "0000000000000000000000000000000000000002"}
+                ]
+              },
+              "associatedPullRequests": {"nodes": []}
+            },
+            {
+              "sha": "0000000000000000000000000000000000000004",
+              "message": "feat: foo commit 2",
+              "parents": {
+                "nodes": [{"oid": "0000000000000000000000000000000000000003"}]
+              },
+              "associatedPullRequests": {"nodes": []}
+            },
+            {
+              "sha": "0000000000000000000000000000000000000003",
+              "message": "feat: foo commit 1",
+              "parents": {
+                "nodes": [{"oid": "0000000000000000000000000000000000000001"}]
+              },
+              "associatedPullRequests": {"nodes": []}
+            },
+            {
+              "sha": "0000000000000000000000000000000000000002",
+              "message": "feat: bar commit",
+              "parents": {
+                "nodes": [{"oid": "0000000000000000000000000000000000000001"}]
+              },
+              "associatedPullRequests": {"nodes": []}
+            },
+            {
+              "sha": "0000000000000000000000000000000000000001",
+              "message": "chore: initial commit",
+              "parents": {"nodes": []},
+              "associatedPullRequests": {"nodes": []}
+            }
+          ],
+          "pageInfo": {
+            "hasNextPage": false,
+            "endCursor": "0000000000000000000000000000000000000001 7"
+          }
+        }
+      }
+    }
+  }
+}

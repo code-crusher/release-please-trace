@@ -14,7 +14,15 @@
 
 import {expect} from 'chai';
 import {describe, it, before} from 'mocha';
+import {execFile as execFileCb} from 'child_process';
+import {promisify} from 'util';
+import {mkdtemp, writeFile} from 'fs/promises';
+import * as os from 'os';
+import * as path from 'path';
 import {LocalGitHub} from '../src/local-github';
+import {GitHubApi} from '../src/github-api';
+
+const execFile = promisify(execFileCb);
 
 describe('LocalGitHub', function () {
   this.timeout(60000);
@@ -148,6 +156,92 @@ describe('LocalGitHub', function () {
       expect(commits.length).to.be.lessThanOrEqual(5);
       expect(commits[0].sha).to.not.be.undefined;
       expect(commits[0].message).to.not.be.undefined;
+    });
+
+    it('iterates over commits in topological order', async () => {
+      // Build a repository where a branch merged after a release keeps its
+      // older commit dates, the scenario from #1533.
+      const repoDir = await mkdtemp(path.join(os.tmpdir(), 'rp-topo-'));
+      const git = async (args: string[], date?: string) => {
+        await execFile('git', args, {
+          cwd: repoDir,
+          env: {
+            ...process.env,
+            GIT_AUTHOR_NAME: 'Test',
+            GIT_AUTHOR_EMAIL: 'test@example.com',
+            GIT_COMMITTER_NAME: 'Test',
+            GIT_COMMITTER_EMAIL: 'test@example.com',
+            ...(date ? {GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date} : {}),
+          },
+        });
+      };
+      const writeAndCommit = async (
+        filename: string,
+        message: string,
+        date: string
+      ) => {
+        await writeFile(path.join(repoDir, filename), message);
+        await git(['add', filename]);
+        await git(['commit', '-m', message], date);
+      };
+
+      await git(['init', '-b', 'main']);
+      await writeAndCommit(
+        'base',
+        'chore: initial commit',
+        '2026-01-01T00:00:00Z'
+      );
+      await git(['checkout', '-b', 'feature-foo']);
+      await writeAndCommit(
+        'foo1',
+        'feat: foo commit 1',
+        '2026-01-01T00:00:00Z'
+      );
+      await writeAndCommit(
+        'foo2',
+        'feat: foo commit 2',
+        '2026-01-01T00:00:00Z'
+      );
+      await git(['checkout', 'main']);
+      await git(['checkout', '-b', 'feature-bar']);
+      await writeAndCommit('bar1', 'feat: bar commit', '2026-01-01T00:00:00Z');
+      await git(['checkout', 'main']);
+      await git(
+        ['merge', '--no-ff', 'feature-bar', '-m', 'Merge feature-bar'],
+        '2026-01-02T00:00:00Z'
+      );
+      await writeAndCommit(
+        'release',
+        'chore: release 1.0.0',
+        '2026-01-03T00:00:00Z'
+      );
+      await git(
+        ['merge', '--no-ff', 'feature-foo', '-m', 'Merge feature-foo'],
+        '2026-01-04T00:00:00Z'
+      );
+
+      const local = new LocalGitHub(
+        {owner: 'fake', repo: 'fake', defaultBranch: 'main'},
+        // Not used by the commit iterator.
+        {} as unknown as GitHubApi,
+        repoDir
+      );
+      const generator = local.mergeCommitIterator('main', {
+        backfillFiles: false,
+      });
+      const messages: string[] = [];
+      for await (const commit of generator) {
+        messages.push(commit.message);
+      }
+      expect(messages).to.eql([
+        'Merge feature-foo',
+        'feat: foo commit 2',
+        'feat: foo commit 1',
+        'chore: release 1.0.0',
+        'Merge feature-bar',
+        'feat: bar commit',
+        'chore: initial commit',
+      ]);
     });
   });
 
