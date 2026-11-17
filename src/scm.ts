@@ -58,6 +58,7 @@ export interface ScmReleaseOptions {
   draft?: boolean;
   prerelease?: boolean;
   forceTag?: boolean;
+  skipGitHubRelease?: boolean;
 }
 
 export interface ScmRelease {

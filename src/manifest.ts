@@ -156,6 +156,7 @@ export interface CandidateRelease extends Release {
   draft?: boolean;
   forceTag?: boolean;
   prerelease?: boolean;
+  skipGitHubRelease?: boolean;
 }
 
 interface ReleaserConfigJson {
@@ -304,6 +305,9 @@ export interface CreatedRelease extends ScmRelease {
   minor: number;
   patch: number;
   prNumber: number;
+  // true when the package is configured with `skip-github-release`:
+  // only the git tag was created, and no GitHub release was published.
+  skipped?: boolean;
 }
 
 export class Manifest {
@@ -550,6 +554,27 @@ export class Manifest {
     // Releases by path
     const releasesByPath: Record<string, Release> = {};
     this.logger.debug(`release search depth: ${this.releaseSearchDepth}`);
+    // packages that skip GitHub releases will not have a corresponding
+    // GitHub release, so look for their expected tags directly instead of
+    // iterating over GitHub releases
+    const pathsWithoutGitHubRelease = Object.keys(strategiesByPath).filter(
+      path => this.repositoryConfig[path].skipGithubRelease
+    );
+    const skippedReleases = await this.releasesFromTags(
+      pathsWithoutGitHubRelease,
+      strategiesByPath
+    );
+    for (const path in skippedReleases) {
+      this.logger.debug(
+        `Found release from tag for ${path}, ${skippedReleases[path].tag.toString()}`
+      );
+      releaseShasByPath[path] = skippedReleases[path].sha;
+      releasesByPath[path] = skippedReleases[path];
+      releasesFound += 1;
+    }
+    const remainingPaths = new Set(
+      Object.keys(strategiesByPath).filter(path => !skippedReleases[path])
+    );
     for await (const release of this.github.releaseIterator({
       maxResults: this.releaseSearchDepth,
     })) {
@@ -559,10 +584,12 @@ export class Manifest {
         continue;
       }
       const component = tagName.component || DEFAULT_COMPONENT_NAME;
-      const paths = pathsByComponent[component] || [];
+      const paths = (pathsByComponent[component] || []).filter(path =>
+        remainingPaths.has(path)
+      );
       if (paths.length === 0) {
-        this.logger.warn(
-          `Found release tag with component '${component}', but not configured in manifest`
+        this.logger.debug(
+          `No matching unreleased path for release tag '${release.tagName}', skipping`
         );
         continue;
       }
@@ -586,6 +613,7 @@ export class Manifest {
             notes: release.notes || '',
           };
           releasesFound += 1;
+          remainingPaths.delete(path);
         }
       }
 
@@ -849,13 +877,16 @@ export class Manifest {
     );
   }
 
-  private async backfillReleasesFromTags(
-    missingPaths: string[],
+  private async releasesFromTags(
+    paths: string[],
     strategiesByPath: Record<string, Strategy>
   ): Promise<Record<string, Release>> {
     const releasesByPath: Record<string, Release> = {};
+    if (paths.length === 0) {
+      return releasesByPath;
+    }
     const allTags = await this.getAllTags();
-    for (const path of missingPaths) {
+    for (const path of paths) {
       const expectedVersion = this.releasedVersions[path];
       if (!expectedVersion) {
         this.logger.warn(`No version for path ${path}`);
@@ -878,37 +909,40 @@ export class Manifest {
           sha: foundTag.sha,
           notes: '',
         };
-      } else {
-        if (
-          strategiesByPath[ROOT_PROJECT_PATH] &&
-          this.repositoryConfig[path].skipGithubRelease
-        ) {
-          this.logger.debug('could not find release, checking root package');
-          const rootComponent = await strategiesByPath[
-            ROOT_PROJECT_PATH
-          ].getComponent();
-          const rootTag = new TagName(
-            expectedVersion,
-            rootComponent,
-            this.repositoryConfig[ROOT_PROJECT_PATH].tagSeparator,
-            this.repositoryConfig[ROOT_PROJECT_PATH].includeVInTag
-          );
-          const foundTag = allTags[rootTag.toString()];
-          if (foundTag) {
-            this.logger.debug(
-              `found rootTag: ${foundTag.name} ${foundTag.sha}`
-            );
-            releasesByPath[path] = {
-              name: foundTag.name,
-              tag: rootTag,
-              sha: foundTag.sha,
-              notes: '',
-            };
-          }
+      } else if (
+        strategiesByPath[ROOT_PROJECT_PATH] &&
+        this.repositoryConfig[path].skipGithubRelease
+      ) {
+        this.logger.debug('could not find release, checking root package');
+        const rootComponent = await strategiesByPath[
+          ROOT_PROJECT_PATH
+        ].getComponent();
+        const rootTag = new TagName(
+          expectedVersion,
+          rootComponent,
+          this.repositoryConfig[ROOT_PROJECT_PATH].tagSeparator,
+          this.repositoryConfig[ROOT_PROJECT_PATH].includeVInTag
+        );
+        const foundTag = allTags[rootTag.toString()];
+        if (foundTag) {
+          this.logger.debug(`found rootTag: ${foundTag.name} ${foundTag.sha}`);
+          releasesByPath[path] = {
+            name: foundTag.name,
+            tag: rootTag,
+            sha: foundTag.sha,
+            notes: '',
+          };
         }
       }
     }
     return releasesByPath;
+  }
+
+  private async backfillReleasesFromTags(
+    missingPaths: string[],
+    strategiesByPath: Record<string, Strategy>
+  ): Promise<Record<string, Release>> {
+    return this.releasesFromTags(missingPaths, strategiesByPath);
   }
 
   private async getAllTags(): Promise<Record<string, ScmTag>> {
@@ -1208,6 +1242,7 @@ export class Manifest {
               config.prerelease &&
               (!!release.tag.version.preRelease ||
                 release.tag.version.major === 0),
+            skipGitHubRelease: config.skipGithubRelease,
           });
         }
       }
@@ -1285,9 +1320,10 @@ export class Manifest {
       }
     }
 
-    if (githubReleases.length > 0) {
+    const createdReleases = githubReleases.filter(r => !r.skipped);
+    if (createdReleases.length > 0) {
       // comment on pull request about the successful releases
-      const releaseList = githubReleases
+      const releaseList = createdReleases
         .map(({tagName, url}) => `- [${tagName}](${url})`)
         .join('\n');
       const comment = `🤖 Created releases:\n\n${releaseList}\n\n:sunflower:`;
@@ -1328,10 +1364,18 @@ export class Manifest {
     release: CandidateRelease,
     pullRequest: PullRequest
   ): Promise<CreatedRelease> {
+    if (release.skipGitHubRelease) {
+      this.logger.info(
+        `Skipping GitHub release for ${release.tag.toString()}, creating tag only`
+      );
+    }
     const githubRelease = await this.github.createRelease(release, {
       draft: release.draft,
       prerelease: release.prerelease,
-      forceTag: release.forceTag,
+      // always force the tag if we're skipping the GitHub release, since
+      // the tag is the only artifact we create
+      forceTag: release.forceTag || release.skipGitHubRelease,
+      skipGitHubRelease: release.skipGitHubRelease,
     });
 
     return {
@@ -1342,6 +1386,7 @@ export class Manifest {
       minor: release.tag.version.minor,
       patch: release.tag.version.patch,
       prNumber: pullRequest.number,
+      skipped: release.skipGitHubRelease,
     };
   }
 
@@ -1681,34 +1726,40 @@ async function latestReleaseVersion(
     }
   }
 
-  // If not found from recent pull requests, look at releases. Iterate
-  // through releases finding valid tags, then cross reference
-  const releaseGenerator = github.releaseIterator();
-  for await (const release of releaseGenerator) {
-    const tagName = TagName.parse(release.tagName);
-    if (!tagName) {
-      continue;
-    }
-
-    if (tagMatchesConfig(tagName, branchPrefix, config.includeComponentInTag)) {
-      logger.debug(`found release for ${prefix}`, tagName.version);
-      if (!commitShas.has(release.sha)) {
-        logger.debug(
-          `SHA not found in recent commits to branch ${targetBranch}, skipping`
-        );
+  // If not found from recent pull requests, look at releases (unless
+  // configured to skip GitHub releases, in which case there are no GitHub
+  // releases to look at). Iterate through releases finding valid tags, then
+  // cross reference
+  if (!config.skipGithubRelease) {
+    const releaseGenerator = github.releaseIterator();
+    for await (const release of releaseGenerator) {
+      const tagName = TagName.parse(release.tagName);
+      if (!tagName) {
         continue;
       }
-      candidateReleaseVersions.push(tagName.version);
-    }
-  }
-  logger.debug(
-    `found ${candidateReleaseVersions.length} possible releases.`,
-    candidateReleaseVersions
-  );
 
-  if (candidateReleaseVersions.length > 0) {
-    // Find largest release number (sort descending then return first)
-    return candidateReleaseVersions.sort((a, b) => b.compare(a))[0];
+      if (
+        tagMatchesConfig(tagName, branchPrefix, config.includeComponentInTag)
+      ) {
+        logger.debug(`found release for ${prefix}`, tagName.version);
+        if (!commitShas.has(release.sha)) {
+          logger.debug(
+            `SHA not found in recent commits to branch ${targetBranch}, skipping`
+          );
+          continue;
+        }
+        candidateReleaseVersions.push(tagName.version);
+      }
+    }
+    logger.debug(
+      `found ${candidateReleaseVersions.length} possible releases.`,
+      candidateReleaseVersions
+    );
+
+    if (candidateReleaseVersions.length > 0) {
+      // Find largest release number (sort descending then return first)
+      return candidateReleaseVersions.sort((a, b) => b.compare(a))[0];
+    }
   }
 
   // If not found from recent pull requests or releases, look at tags. Iterate

@@ -666,7 +666,37 @@ export class GitHubApi {
   );
 
   /**
+   * Create a git tag. Used to support `skip-github-release`, where the
+   * git tag is created but no GitHub release is created.
+   * @param {Release} release Release parameters
+   */
+  private async createTag(release: Release): Promise<void> {
+    try {
+      await this.octokit.git.createRef({
+        owner: this.repository.owner,
+        repo: this.repository.repo,
+        ref: `refs/tags/${release.tag.toString()}`,
+        sha: release.sha,
+      });
+    } catch (err) {
+      // ignore if tag already exists
+      if ((err as RequestError).status === 422) {
+        this.logger.debug(
+          `Tag ${release.tag.toString()} already exists, skipping tag creation`
+        );
+        return;
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Create a GitHub release
+   *
+   * When `options.skipGitHubRelease` is set, no GitHub release is created;
+   * only the git tag is created (if it does not already exist). This allows
+   * release-please to maintain tags for future changelog and version
+   * generation without creating a GitHub release.
    *
    * @param {Release} release Release parameters
    * @param {ScmReleaseOptions} options Release option parameters
@@ -678,24 +708,20 @@ export class GitHubApi {
       release: Release,
       options: ScmReleaseOptions = {}
     ): Promise<ScmRelease> => {
+      if (options.skipGitHubRelease) {
+        await this.createTag(release);
+        return {
+          id: 0,
+          name: release.name,
+          tagName: release.tag.toString(),
+          sha: release.sha,
+          notes: release.notes,
+          url: '',
+          draft: false,
+        };
+      }
       if (options.forceTag) {
-        try {
-          await this.octokit.git.createRef({
-            owner: this.repository.owner,
-            repo: this.repository.repo,
-            ref: `refs/tags/${release.tag.toString()}`,
-            sha: release.sha,
-          });
-        } catch (err) {
-          // ignore if tag already exists
-          if ((err as RequestError).status === 422) {
-            this.logger.debug(
-              `Tag ${release.tag.toString()} already exists, skipping tag creation`
-            );
-          } else {
-            throw err;
-          }
-        }
+        await this.createTag(release);
       }
       const resp = await this.octokit.repos.createRelease({
         name: release.name,

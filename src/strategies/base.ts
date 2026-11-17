@@ -69,7 +69,6 @@ export interface BaseStrategyOptions {
   headerPartial?: string;
   mainTemplate?: string;
   tagSeparator?: string;
-  skipGitHubRelease?: boolean;
   skipChangelog?: boolean;
   releaseAs?: string;
   changelogNotes?: ChangelogNotes;
@@ -107,7 +106,6 @@ export abstract class BaseStrategy implements Strategy {
   protected changelogPath: string;
   protected changelogHost?: string;
   protected tagSeparator?: string;
-  private skipGitHubRelease: boolean;
   protected skipChangelog: boolean;
   private releaseAs?: string;
   protected includeComponentInTag: boolean;
@@ -144,7 +142,6 @@ export abstract class BaseStrategy implements Strategy {
     this.changelogHost = options.changelogHost;
     this.changelogSections = options.changelogSections;
     this.tagSeparator = options.tagSeparator;
-    this.skipGitHubRelease = options.skipGitHubRelease || false;
     this.skipChangelog = options.skipChangelog || false;
     this.releaseAs = options.releaseAs;
     this.changelogNotes =
@@ -595,10 +592,6 @@ export abstract class BaseStrategy implements Strategy {
     mergedPullRequest: PullRequest,
     options?: BuildReleaseOptions
   ): Promise<Release | undefined> {
-    if (this.skipGitHubRelease) {
-      this.logger.info('Release skipped from strategy config');
-      return;
-    }
     if (!mergedPullRequest.sha) {
       this.logger.error('Pull request should have been merged');
       return;

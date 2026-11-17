@@ -5319,20 +5319,31 @@ describe('Manifest', () => {
         }
       );
       const releases = await manifest.buildReleases();
-      expect(releases).lengthOf(3);
-      expect(releases[0].tag.toString()).to.eql('bot-config-utils-v3.2.0');
+      expect(releases).lengthOf(4);
+      expect(releases.map(release => release.tag.toString())).to.eql([
+        'bot-config-utils-v3.2.0',
+        'label-utils-v1.1.0',
+        'object-selector-v1.1.0',
+        'datastore-lock-v2.1.0',
+      ]);
+      expect(
+        releases.find(r => r.path === 'packages/object-selector')!
+          .skipGitHubRelease
+      ).to.be.true;
       expect(releases[0].sha).to.eql('abc123');
       expect(releases[0].notes)
         .to.be.a('string')
         .and.satisfy((msg: string) => msg.startsWith('### Features'));
-      expect(releases[1].tag.toString()).to.eql('label-utils-v1.1.0');
       expect(releases[1].sha).to.eql('abc123');
       expect(releases[1].notes)
         .to.be.a('string')
         .and.satisfy((msg: string) => msg.startsWith('### Features'));
-      expect(releases[2].tag.toString()).to.eql('datastore-lock-v2.1.0');
       expect(releases[2].sha).to.eql('abc123');
       expect(releases[2].notes)
+        .to.be.a('string')
+        .and.satisfy((msg: string) => msg.startsWith('### Features'));
+      expect(releases[3].sha).to.eql('abc123');
+      expect(releases[3].notes)
         .to.be.a('string')
         .and.satisfy((msg: string) => msg.startsWith('### Features'));
     });
@@ -6490,6 +6501,7 @@ describe('Manifest', () => {
         draft: true,
         prerelease: undefined,
         forceTag: undefined,
+        skipGitHubRelease: undefined,
       } as ReleaseOptions);
       sinon.assert.calledOnce(commentStub);
       sinon.assert.calledOnceWithExactly(
@@ -6569,6 +6581,7 @@ describe('Manifest', () => {
         draft: true,
         prerelease: undefined,
         forceTag: true,
+        skipGitHubRelease: undefined,
       } as ReleaseOptions);
       sinon.assert.calledOnce(commentStub);
       sinon.assert.calledOnceWithExactly(
@@ -6649,6 +6662,7 @@ describe('Manifest', () => {
         draft: undefined,
         prerelease: true,
         forceTag: undefined,
+        skipGitHubRelease: undefined,
       } as ReleaseOptions);
       sinon.assert.calledOnce(commentStub);
       sinon.assert.calledOnceWithExactly(
@@ -6727,6 +6741,7 @@ describe('Manifest', () => {
         draft: undefined,
         prerelease: false,
         forceTag: undefined,
+        skipGitHubRelease: undefined,
       } as ReleaseOptions);
       sinon.assert.calledOnce(commentStub);
       sinon.assert.calledOnceWithExactly(
@@ -6858,6 +6873,280 @@ describe('Manifest', () => {
         ['autorelease: pending'],
         1234
       );
+    });
+
+    it('should create a git tag, but skip the GitHub release when configured', async () => {
+      mockPullRequests(
+        github,
+        [],
+        [
+          {
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            number: 1234,
+            title: 'chore: release main',
+            body: pullRequestBody('release-notes/multiple.txt'),
+            labels: ['autorelease: pending'],
+            files: [
+              'packages/bot-config-utils/package.json',
+              'packages/label-utils/package.json',
+              'packages/object-selector/package.json',
+              'packages/datastore-lock/package.json',
+            ],
+            sha: 'abc123',
+          },
+        ]
+      );
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('packages/bot-config-utils/package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-automations/bot-config-utils'})
+          )
+        )
+        .withArgs('packages/label-utils/package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-automations/label-utils'})
+          )
+        )
+        .withArgs('packages/object-selector/package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-automations/object-selector'})
+          )
+        )
+        .withArgs('packages/datastore-lock/package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-automations/datastore-lock'})
+          )
+        );
+      const createReleaseStub = mockCreateRelease(github, [
+        {id: 1, sha: 'abc123', tagName: 'bot-config-utils-v3.2.0'},
+        {id: 2, sha: 'abc123', tagName: 'label-utils-v1.1.0'},
+        {id: 3, sha: 'abc123', tagName: 'object-selector-v1.1.0'},
+        {id: 4, sha: 'abc123', tagName: 'datastore-lock-v2.1.0'},
+      ]);
+      const commentStub = sandbox.stub(github, 'commentOnIssue').resolves();
+      const addLabelsStub = sandbox.stub(github, 'addIssueLabels').resolves();
+      const removeLabelsStub = sandbox
+        .stub(github, 'removeIssueLabels')
+        .resolves();
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          'packages/bot-config-utils': {
+            releaseType: 'node',
+          },
+          'packages/label-utils': {
+            releaseType: 'node',
+          },
+          'packages/object-selector': {
+            releaseType: 'node',
+            skipGithubRelease: true,
+          },
+          'packages/datastore-lock': {
+            releaseType: 'node',
+          },
+        },
+        {
+          'packages/bot-config-utils': Version.parse('3.1.4'),
+          'packages/label-utils': Version.parse('1.0.1'),
+          'packages/object-selector': Version.parse('1.0.2'),
+          'packages/datastore-lock': Version.parse('2.0.0'),
+        }
+      );
+      const releases = await manifest.createReleases();
+      expect(releases).lengthOf(4);
+      expect(releases.map(release => release?.tagName)).to.eql([
+        'bot-config-utils-v3.2.0',
+        'label-utils-v1.1.0',
+        'object-selector-v1.1.0',
+        'datastore-lock-v2.1.0',
+      ]);
+      // the skipped package should be tagged, but not published
+      const skipped = releases[2]!;
+      expect(skipped.tagName).to.eql('object-selector-v1.1.0');
+      expect(skipped.skipped).to.be.true;
+      expect(releases[0]!.skipped).to.not.be.true;
+      expect(releases[1]!.skipped).to.not.be.true;
+      expect(releases[3]!.skipped).to.not.be.true;
+      // the skipped package is passed to the scm with `skipGitHubRelease`
+      // and forced tag creation
+      sinon.assert.calledWithMatch(
+        createReleaseStub,
+        sinon.match.has(
+          'tag',
+          sinon.match((tag: TagName) => tag.toString() === 'object-selector-v1.1.0')
+        ),
+        {
+          draft: undefined,
+          prerelease: undefined,
+          forceTag: true,
+          skipGitHubRelease: true,
+        } as ReleaseOptions
+      );
+      // the non-skipped packages are released as usual
+      sinon.assert.calledWithMatch(
+        createReleaseStub,
+        sinon.match.has(
+          'tag',
+          sinon.match((tag: TagName) => tag.toString() === 'bot-config-utils-v3.2.0')
+        ),
+        {
+          draft: undefined,
+          prerelease: undefined,
+          forceTag: undefined,
+          skipGitHubRelease: undefined,
+        } as ReleaseOptions
+      );
+      // the comment includes the published releases, but not the skipped one
+      sinon.assert.calledOnce(commentStub);
+      const comment = commentStub.firstCall.firstArg as string;
+      expect(comment).to.include('bot-config-utils-v3.2.0');
+      expect(comment).to.include('label-utils-v1.1.0');
+      expect(comment).to.include('datastore-lock-v2.1.0');
+      expect(comment).to.not.include('object-selector-v1.1.0');
+      // labels are still updated once the tags/releases are created
+      sinon.assert.calledOnceWithExactly(
+        addLabelsStub,
+        ['autorelease: tagged'],
+        1234
+      );
+      sinon.assert.calledOnceWithExactly(
+        removeLabelsStub,
+        ['autorelease: pending'],
+        1234
+      );
+    });
+
+    it('should only create a git tag when all packages skip GitHub releases', async () => {
+      mockPullRequests(
+        github,
+        [],
+        [
+          {
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            number: 1234,
+            title: 'chore: release main',
+            body: pullRequestBody('release-notes/single-manifest.txt'),
+            labels: ['autorelease: pending'],
+            files: [],
+            sha: 'abc123',
+          },
+        ]
+      );
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-cloud/release-brancher'})
+          )
+        );
+      const createReleaseStub = mockCreateRelease(github, [
+        {id: 123456, sha: 'abc123', tagName: 'release-brancher-v1.3.1'},
+      ]);
+      const commentStub = sandbox.stub(github, 'commentOnIssue').resolves();
+      const addLabelsStub = sandbox.stub(github, 'addIssueLabels').resolves();
+      const removeLabelsStub = sandbox
+        .stub(github, 'removeIssueLabels')
+        .resolves();
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          '.': {
+            releaseType: 'node',
+            skipGithubRelease: true,
+          },
+        },
+        {
+          '.': Version.parse('1.3.1'),
+        }
+      );
+      const releases = await manifest.createReleases();
+      expect(releases).lengthOf(1);
+      expect(releases[0]!.skipped).to.be.true;
+      sinon.assert.calledOnceWithExactly(
+        createReleaseStub,
+        sinon.match.any,
+        {
+          draft: undefined,
+          prerelease: undefined,
+          forceTag: true,
+          skipGitHubRelease: true,
+        } as ReleaseOptions
+      );
+      // no comment is posted, since no GitHub release was created
+      sinon.assert.notCalled(commentStub);
+      sinon.assert.calledOnceWithExactly(
+        addLabelsStub,
+        ['autorelease: tagged'],
+        1234
+      );
+      sinon.assert.calledOnceWithExactly(
+        removeLabelsStub,
+        ['autorelease: pending'],
+        1234
+      );
+    });
+
+    it('should build releases for packages that skip GitHub releases', async () => {
+      mockPullRequests(
+        github,
+        [],
+        [
+          {
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            number: 1234,
+            title: 'chore: release main',
+            body: pullRequestBody('release-notes/single-manifest.txt'),
+            labels: ['autorelease: pending'],
+            files: [],
+            sha: 'abc123',
+          },
+        ]
+      );
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-cloud/release-brancher'})
+          )
+        );
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          '.': {
+            releaseType: 'node',
+            skipGithubRelease: true,
+          },
+        },
+        {
+          '.': Version.parse('1.3.1'),
+        }
+      );
+      const releases = await manifest.buildReleases();
+      expect(releases).lengthOf(1);
+      expect(releases[0].tag.toString()).to.eql('release-brancher-v1.3.1');
+      expect(releases[0].skipGitHubRelease).to.be.true;
     });
 
     it('should throw DuplicateReleaseError if all releases already tagged', async () => {

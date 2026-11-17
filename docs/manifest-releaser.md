@@ -220,10 +220,10 @@ defaults (those are documented in comments)
   // Absence defaults to false.
   "force-tag-creation": true
 
-  // Skip creating GitHub Releases
-  // Absence defaults to false and Releases will be created. Release-Please still
-  // requires releases to be tagged, so this option should only be used if you
-  // have existing infrastructure to tag these releases.
+  // Skip creating GitHub Releases. Release-Please will still create and
+  // maintain the git tag for the release (so it can determine the next
+  // version and changelog), but no GitHub release will be published.
+  // Absence defaults to false and Releases will be created.
   "skip-github-release": true,
 
   // Skip updating the changelog.
