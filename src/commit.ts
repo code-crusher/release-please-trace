@@ -384,7 +384,56 @@ function parseCommits(message: string): parser.ConventionalChangelogCommit[] {
   );
 }
 
+// Parses a commit message that does not follow the Conventional Commits
+// format, e.g., "updated the README". The message is re-parsed with a
+// synthetic type prepended, so that footers in the message body, e.g.,
+// "BREAKING CHANGE:", are still extracted. If that also fails, the
+// message is kept verbatim:
+function parseNonConformingCommits(
+  message: string
+): parser.ConventionalChangelogCommit[] {
+  try {
+    return parseCommits(`${NON_CONFORMING_PREFIX}${message}`).map(commit => {
+      if (commit.type === NON_CONFORMING_TYPE) {
+        // Remove the synthetic prefix from the header, the subject
+        // already contains just the original message:
+        commit.header = commit.header.replace(NON_CONFORMING_PREFIX, '');
+      }
+      return commit;
+    });
+  } catch (_err) {
+    return [toNonConformingCommit(message)];
+  }
+}
+
+function toNonConformingCommit(
+  message: string
+): parser.ConventionalChangelogCommit {
+  const firstLine = message.split(/\r?\n/)[0];
+  const bodyIndex = message.indexOf('\n\n');
+  const body = bodyIndex === -1 ? '' : message.substring(bodyIndex + 2).trim();
+  const commit = {
+    ...getBlankConventionalCommit(),
+    type: NON_CONFORMING_TYPE,
+    header: firstLine,
+    subject: firstLine,
+    body,
+  };
+  return postProcessCommits(commit);
+}
+
 const UNTERMINATED_SCOPE_LINE_REGEX = /^[^\s:!()]+\([^()\r\n]*(?:\(|\r?$)/;
+
+// Type given to commits that do not follow the Conventional Commits
+// format, e.g., "updated the README". Rather than dropping these
+// commits, they are kept with a special type so that downstream
+// handlers, e.g., changelog notes builders, can decide whether to
+// display them. This type is not included in the default changelog
+// sections, so these commits remain hidden unless the user opts in via
+// `changelog-sections`:
+// https://github.com/googleapis/release-please/issues/1331
+export const NON_CONFORMING_TYPE = 'MISC';
+const NON_CONFORMING_PREFIX = `${NON_CONFORMING_TYPE}: `;
 
 /**
  * `@conventional-commits/parser` attempts to parse the start of every body line
@@ -456,25 +505,9 @@ export function parseConventionalCommits(
     for (const commitMessage of splitMessages(
       preprocessCommitMessage(commit)
     )) {
+      let parsedCommits: parser.ConventionalChangelogCommit[];
       try {
-        for (const parsedCommit of parseCommits(commitMessage)) {
-          const breaking =
-            parsedCommit.notes.filter(note => note.title === 'BREAKING CHANGE')
-              .length > 0;
-          conventionalCommits.push({
-            sha: commit.sha,
-            message: parsedCommit.header,
-            files: commit.files,
-            pullRequest: commit.pullRequest,
-            type: parsedCommit.type,
-            scope: parsedCommit.scope,
-            bareMessage: parsedCommit.subject,
-            notes: parsedCommit.notes,
-            references: parsedCommit.references,
-            breaking,
-            author: commit.author,
-          });
-        }
+        parsedCommits = parseCommits(commitMessage);
       } catch (_err) {
         logger.debug(
           `commit could not be parsed: ${commit.sha} ${
@@ -482,6 +515,28 @@ export function parseConventionalCommits(
           }`
         );
         logger.debug(`error message: ${_err}`);
+        // The commit message does not conform to the Conventional Commits
+        // format. Keep the commit, with a special type, rather than
+        // dropping it:
+        parsedCommits = parseNonConformingCommits(commitMessage);
+      }
+      for (const parsedCommit of parsedCommits) {
+        const breaking =
+          parsedCommit.notes.filter(note => note.title === 'BREAKING CHANGE')
+            .length > 0;
+        conventionalCommits.push({
+          sha: commit.sha,
+          message: parsedCommit.header,
+          files: commit.files,
+          pullRequest: commit.pullRequest,
+          type: parsedCommit.type,
+          scope: parsedCommit.scope,
+          bareMessage: parsedCommit.subject,
+          notes: parsedCommit.notes,
+          references: parsedCommit.references,
+          breaking,
+          author: commit.author,
+        });
       }
     }
   }

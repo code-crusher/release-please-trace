@@ -35,6 +35,59 @@ describe('parseConventionalCommits', () => {
     expect(conventionalCommits[2].scope).is.null;
   });
 
+  it('parses non-conforming commits as MISC', async () => {
+    const commits = [
+      buildMockCommit('just a plain commit message'),
+      buildMockCommit('feat: some feature'),
+    ];
+    const conventionalCommits = parseConventionalCommits(commits);
+    expect(conventionalCommits).lengthOf(2);
+    expect(conventionalCommits[0].type).to.equal('MISC');
+    expect(conventionalCommits[0].scope).is.null;
+    expect(conventionalCommits[0].bareMessage).to.equal(
+      'just a plain commit message'
+    );
+    expect(conventionalCommits[0].message).to.equal(
+      'just a plain commit message'
+    );
+    expect(conventionalCommits[1].type).to.equal('feat');
+  });
+
+  it('keeps the summary and body of non-conforming commits', async () => {
+    const commits = [
+      buildMockCommit('just a plain commit message\n\nsome body text'),
+    ];
+    const conventionalCommits = parseConventionalCommits(commits);
+    expect(conventionalCommits).lengthOf(1);
+    expect(conventionalCommits[0].type).to.equal('MISC');
+    expect(conventionalCommits[0].bareMessage).to.equal(
+      'just a plain commit message'
+    );
+  });
+
+  it('extracts BREAKING CHANGE notes from non-conforming commits', async () => {
+    const commits = [buildMockCommit('some note\n\nBREAKING CHANGE: it broke')];
+    const conventionalCommits = parseConventionalCommits(commits);
+    expect(conventionalCommits).lengthOf(1);
+    expect(conventionalCommits[0].type).to.equal('MISC');
+    expect(conventionalCommits[0].breaking).to.be.true;
+    expect(conventionalCommits[0].notes).lengthOf(1);
+    expect(conventionalCommits[0].notes[0].title).to.equal('BREAKING CHANGE');
+    expect(conventionalCommits[0].notes[0].text).to.equal('it broke');
+  });
+
+  it('keeps a non-conventional message verbatim if it cannot be parsed', async () => {
+    const commits = [
+      buildMockCommit('fix(a(b)): invalid nested scope in header'),
+    ];
+    const conventionalCommits = parseConventionalCommits(commits);
+    expect(conventionalCommits).lengthOf(1);
+    expect(conventionalCommits[0].type).to.equal('MISC');
+    expect(conventionalCommits[0].bareMessage).to.equal(
+      'fix(a(b)): invalid nested scope in header'
+    );
+  });
+
   it('can parse a breaking change', async () => {
     const commits = [buildMockCommit('fix!: some breaking fix')];
     const conventionalCommits = parseConventionalCommits(commits);
@@ -245,9 +298,15 @@ describe('parseConventionalCommits', () => {
       buildMockCommit('fix(a(b)): invalid nested scope in header is ignored'),
     ];
     const conventionalCommits = parseConventionalCommits(commits);
-    expect(conventionalCommits).lengthOf(1);
+    expect(conventionalCommits).lengthOf(2);
     expect(conventionalCommits[0].type).to.equal('feat');
     expect(conventionalCommits[0].bareMessage).to.equal('something');
+    // The invalid nested scope cannot be parsed as a conventional commit,
+    // but the commit is retained as a non-conforming (MISC) commit:
+    expect(conventionalCommits[1].type).to.equal('MISC');
+    expect(conventionalCommits[1].bareMessage).to.equal(
+      'fix(a(b)): invalid nested scope in header is ignored'
+    );
   });
 
   it('handles wrapped function calls with unclosed parentheses in body', async () => {

@@ -71,17 +71,24 @@ describe('SentenceCase Plugin', () => {
       ...buildMockConventionalCommit('abc123'),
       ...buildMockConventionalCommit('fix: hello world:goodnight moon'),
     ]);
-    expect(commits[0].message).to.equal('fix: Hello world:goodnight moon');
+    // 'abc123' is not a conventional commit, it is retained as a
+    // non-conforming (MISC) commit, with no sentence-casing applied to
+    // the message:
+    expect(commits[0].message).to.equal('abc123');
+    expect(commits[1].message).to.equal('fix: Hello world:goodnight moon');
   });
   it('handles commit with no :', async () => {
     const plugin = new SentenceCase(github, 'main', {}, []);
     const commits = await plugin.processCommits([
       ...buildMockConventionalCommit('hello world goodnight moon'),
     ]);
-    // Ensure there's no exception, a commit without a <type> is not
-    // a conventional commit, and will not show up in CHANGELOG. We
-    // Do not bother sentence-casing:
-    console.info(commits);
-    expect(commits.length).to.equal(0);
+    // Ensure there's no exception. A commit without a <type> is not a
+    // conventional commit, it is retained as a non-conforming (MISC)
+    // commit. It will not show up in the CHANGELOG unless the user
+    // opts in via `changelog-sections`. We do not bother
+    // sentence-casing the message:
+    expect(commits.length).to.equal(1);
+    expect(commits[0].type).to.equal('MISC');
+    expect(commits[0].message).to.equal('hello world goodnight moon');
   });
 });

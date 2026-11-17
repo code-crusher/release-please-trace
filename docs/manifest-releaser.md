@@ -183,6 +183,9 @@ defaults (those are documented in comments)
 
   // set default conventional commit => changelog sections mapping/appearance.
   // absence defaults to https://git.io/JqCZL
+  // commits that do not follow the conventional commit format are kept
+  // with type "MISC" and can be displayed by adding a section for that
+  // type, e.g., {"type": "MISC", "section": "Miscellaneous"}
   "changelog-sections": [...],
 
   // set default github host in changelog
