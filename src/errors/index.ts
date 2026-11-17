@@ -13,7 +13,10 @@
 // limitations under the License.
 
 import {RequestError} from '@octokit/request-error';
-import {RequestError as RequestErrorBody} from '@octokit/types';
+import {
+  RequestError as RequestErrorBody,
+  ResponseHeaders,
+} from '@octokit/types';
 
 interface SingleError {
   resource: string;
@@ -46,12 +49,51 @@ export class GitHubAPIError extends Error {
   status: number;
   cause?: Error;
   constructor(requestError: RequestError, message?: string) {
-    super(message ?? requestError.message);
+    super(
+      message ??
+        (GitHubAPIError.isRateLimitError(requestError)
+          ? GitHubAPIError.rateLimitMessage(requestError)
+          : requestError.message)
+    );
     this.status = requestError.status;
     this.body = GitHubAPIError.parseErrorBody(requestError);
     this.name = GitHubAPIError.name;
     this.cause = requestError;
     this.stack = requestError.stack;
+  }
+
+  /**
+   * Returns `true` when the request was rejected because of GitHub's primary
+   * rate limit. GitHub returns HTTP 429 for an exceeded rate limit and HTTP
+   * 403 (with the remaining limit reported as 0) once the limit is exhausted.
+   * A 403 is only treated as a rate limit when the response headers confirm it,
+   * since 403 is also used for permission errors.
+   */
+  static isRateLimitError(requestError: RequestError): boolean {
+    if (requestError.status === 429) {
+      return true;
+    }
+    if (requestError.status === 403) {
+      const headers = parseRateLimitHeaders(requestError.response?.headers);
+      return (
+        headers.remaining === '0' || /rate limit/i.test(requestError.message)
+      );
+    }
+    return false;
+  }
+
+  /**
+   * Builds a clear message for requests rejected because of GitHub's primary
+   * rate limit. These are otherwise easy to confuse with secondary rate
+   * limiting or a generic server error.
+   */
+  static rateLimitMessage(requestError: RequestError): string {
+    const description = describeRateLimit(requestError.response?.headers);
+    const base =
+      requestError.status === 429
+        ? 'GitHub rate limit exceeded'
+        : 'GitHub rate limit may have been exceeded';
+    return description ? `${base}: ${description}` : `${base}.`;
   }
 
   static parseErrorBody(
@@ -64,6 +106,59 @@ export class GitHubAPIError extends Error {
   static parseErrors(requestError: RequestError): SingleError[] {
     return GitHubAPIError.parseErrorBody(requestError)?.errors || [];
   }
+}
+
+/**
+ * The `x-ratelimit-*` response headers returned by the GitHub REST API. These
+ * are used to determine whether a failed request was caused by hitting the
+ * primary rate limit, and to warn when the limit is running low.
+ */
+export interface RateLimitHeaders {
+  limit?: string;
+  remaining?: string;
+  reset?: string;
+}
+
+/**
+ * Normalizes the rate limit headers returned by GitHub (keyed as
+ * `x-ratelimit-*`) onto a single object.
+ */
+export function parseRateLimitHeaders(
+  headers: ResponseHeaders | undefined
+): RateLimitHeaders {
+  return {
+    limit: headers?.['x-ratelimit-limit'],
+    remaining: headers?.['x-ratelimit-remaining'],
+    reset: headers?.['x-ratelimit-reset'],
+  };
+}
+
+/**
+ * Builds a human-friendly description of the current rate limit state, suitable
+ * for use in error messages and warnings. Returns `undefined` when no rate
+ * limit information was present in the response headers.
+ */
+export function describeRateLimit(
+  headers: ResponseHeaders | undefined
+): string | undefined {
+  const {limit, remaining, reset} = parseRateLimitHeaders(headers);
+  if (limit === undefined && remaining === undefined && reset === undefined) {
+    return undefined;
+  }
+  const parts: string[] = [];
+  if (remaining !== undefined) {
+    parts.push(`${remaining} remaining`);
+  }
+  if (limit !== undefined) {
+    parts.push(`of ${limit}`);
+  }
+  if (reset !== undefined) {
+    const resetSeconds = Number(reset);
+    if (!Number.isNaN(resetSeconds)) {
+      parts.push(`(resets at ${new Date(resetSeconds * 1000).toUTCString()})`);
+    }
+  }
+  return parts.join(' ');
 }
 
 export class AuthError extends GitHubAPIError {

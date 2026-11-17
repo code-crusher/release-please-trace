@@ -17,6 +17,8 @@ import {describe, it, afterEach, beforeEach} from 'mocha';
 import * as sinon from 'sinon';
 
 import {parser, handleError} from '../src/bin/release-please';
+import {GitHubAPIError} from '../src/errors';
+import {RequestError} from '@octokit/request-error';
 import {
   Manifest,
   DEFAULT_RELEASE_PLEASE_CONFIG,
@@ -88,6 +90,62 @@ describe('CLI', () => {
       expect(() => handleError({message: '', stack: ''})).to.throw(
         'Set handleError.yargsArgs with a yargs.Arguments instance.'
       );
+    });
+
+    it('reports rate limit info when the error carries rate limit headers', async () => {
+      const logs: string[] = [];
+      handleError.logger = {
+        error: (msg: string) => logs.push(msg),
+      } as unknown as Console;
+      handleError.yargsArgs = {debug: false, _: ['foobar'], $0: 'mocha?'};
+      const requestError = new RequestError('API rate limit exceeded', 429, {
+        response: {
+          headers: {
+            'x-ratelimit-limit': '5000',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-reset': '1800000000',
+          },
+          status: 429,
+          url: 'https://api.github.com/rate_limit',
+          data: {message: 'API rate limit exceeded'},
+        },
+        request: {
+          headers: {},
+          method: 'GET',
+          url: 'https://api.github.com/rate_limit',
+        },
+      });
+      const err = {
+        body: {message: 'API rate limit exceeded'},
+        status: 429,
+        message: 'GitHub rate limit exceeded: 0 remaining of 5000',
+        stack: 'bad\nmore\nbad',
+        cause: new GitHubAPIError(requestError),
+      };
+      handleError(err);
+      snapshot(logs);
+    });
+
+    it('reports rate limit info from a raw response header', async () => {
+      const logs: string[] = [];
+      handleError.logger = {
+        error: (msg: string) => logs.push(msg),
+      } as unknown as Console;
+      handleError.yargsArgs = {debug: false, _: ['foobar'], $0: 'mocha?'};
+      const err = {
+        body: {message: 'API rate limit exceeded'},
+        status: 403,
+        message: 'API rate limit exceeded',
+        stack: 'bad\nmore\nbad',
+        response: {
+          headers: {
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-limit': '60',
+          },
+        },
+      };
+      handleError(err);
+      snapshot(logs);
     });
   });
   describe('manifest-pr', () => {

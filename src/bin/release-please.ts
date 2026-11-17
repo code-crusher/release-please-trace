@@ -17,6 +17,7 @@
 import {coerceOption} from '../util/coerce-option';
 import * as yargs from 'yargs';
 import {GitHub} from '../github';
+import {describeRateLimit, GitHubAPIError} from '../errors';
 import {GH_API_URL, GH_GRAPHQL_URL} from '../github-api';
 import {Manifest, ManifestOptions, ROOT_PROJECT_PATH} from '../manifest';
 import {ChangelogSection, buildChangelogSections} from '../changelog-notes';
@@ -42,6 +43,10 @@ interface ErrorObject {
   status?: number;
   message: string;
   stack: string;
+  cause?: Error;
+  response?: {
+    headers?: Record<string, string>;
+  };
 }
 
 interface GitHubArgs {
@@ -972,6 +977,18 @@ export const handleError: HandleError = (err: ErrorObject) => {
   errorLogger.error(
     `command ${command} failed${status ? ` with status ${status}` : ''}`
   );
+
+  const requestError =
+    err.cause instanceof GitHubAPIError ? err.cause.cause : err.cause;
+  const headers =
+    err.response?.headers ??
+    (requestError as {response?: {headers?: Record<string, string>}})?.response
+      ?.headers;
+  const rateLimitDescription = describeRateLimit(headers);
+  if (rateLimitDescription) {
+    errorLogger.error(`GitHub rate limit: ${rateLimitDescription}`);
+  }
+
   if (ya?.debug) {
     logger.error('---------');
     logger.error(err.stack);

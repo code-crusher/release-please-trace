@@ -294,3 +294,13 @@ Options:
 exports['CLI handleError handles an error 1'] = [
   "command foobar failed with status 404"
 ]
+
+exports['CLI handleError reports rate limit info from a raw response header 1'] = [
+  "command foobar failed with status 403",
+  "GitHub rate limit: 0 remaining of 60"
+]
+
+exports['CLI handleError reports rate limit info when the error carries rate limit headers 1'] = [
+  "command foobar failed with status 429",
+  "GitHub rate limit: 0 remaining of 5000 (resets at Fri, 15 Jan 2027 08:00:00 GMT)"
+]
