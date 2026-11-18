@@ -238,5 +238,150 @@ describe('PullRequestBody', () => {
       const pullRequestBody = new PullRequestBody(data);
       snapshot(pullRequestBody.toString());
     });
+
+    it('can handle a custom extra description', () => {
+      const data = [
+        {
+          component: 'pkg1',
+          version: Version.parse('1.2.3'),
+          notes: 'some special notes go here',
+        },
+      ];
+      const pullRequestBody = new PullRequestBody(data, {
+        extraDescription: 'Some extra description of the release',
+      });
+      snapshot(pullRequestBody.toString());
+    });
+  });
+
+  describe('extraDescription', () => {
+    it('should parse an extra description from a body', () => {
+      const body = [
+        ':robot: I have created a release *beep* *boop*',
+        '---',
+        '',
+        '<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        'Some extra description of the release',
+        '<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        '',
+        '## [1.2.3](https://github.com/fake/repo/compare/v1.2.2...v1.2.3) (2024-01-01)',
+        '',
+        '### Features',
+        '',
+        '* some feature',
+        '',
+        '---',
+        'This PR was generated with Release Please.',
+      ].join('\n');
+      const pullRequestBody = PullRequestBody.parse(body);
+      expect(pullRequestBody).to.not.be.undefined;
+      expect(pullRequestBody!.extraDescription).to.eql(
+        'Some extra description of the release'
+      );
+      expect(pullRequestBody!.releaseData).lengthOf(1);
+      expect(pullRequestBody!.releaseData[0].version?.toString()).to.eql(
+        '1.2.3'
+      );
+      expect(pullRequestBody!.releaseData[0].notes).to.not.include(
+        'RELEASE_PLEASE_EXTRA_DESCRIPTION'
+      );
+    });
+
+    it('should not extract an extra description from release notes', () => {
+      const body = [
+        ':robot: I have created a release *beep* *boop*',
+        '---',
+        '',
+        '<details><summary>pkg1: 1.2.3</summary>',
+        '',
+        '### Features',
+        '',
+        '* some feature',
+        '</details>',
+        '',
+        '---',
+        'This PR was generated with Release Please.',
+      ].join('\n');
+      const pullRequestBody = PullRequestBody.parse(body);
+      expect(pullRequestBody).to.not.be.undefined;
+      expect(pullRequestBody!.extraDescription).to.be.undefined;
+    });
+
+    it('should concatenate multiple extra description blocks', () => {
+      const body = [
+        ':robot: I have created a release *beep* *boop*',
+        '---',
+        '',
+        '<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        'First description',
+        '<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        '',
+        '<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        'Second description',
+        '<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        '',
+        '## [1.2.3](https://github.com/fake/repo/compare/v1.2.2...v1.2.3) (2024-01-01)',
+        '',
+        '### Features',
+        '',
+        '* some feature',
+        '',
+        '---',
+        'This PR was generated with Release Please.',
+      ].join('\n');
+      const pullRequestBody = PullRequestBody.parse(body);
+      expect(pullRequestBody).to.not.be.undefined;
+      expect(pullRequestBody!.extraDescription).to.eql(
+        'First description\n\nSecond description'
+      );
+      expect(pullRequestBody!.releaseData).lengthOf(1);
+    });
+
+    it('should ignore an empty extra description block', () => {
+      const body = [
+        ':robot: I have created a release *beep* *boop*',
+        '---',
+        '',
+        '<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        '<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->',
+        '',
+        '## [1.2.3](https://github.com/fake/repo/compare/v1.2.2...v1.2.3) (2024-01-01)',
+        '',
+        '### Features',
+        '',
+        '* some feature',
+        '',
+        '---',
+        'This PR was generated with Release Please.',
+      ].join('\n');
+      const pullRequestBody = PullRequestBody.parse(body);
+      expect(pullRequestBody).to.not.be.undefined;
+      expect(pullRequestBody!.extraDescription).to.be.undefined;
+    });
+
+    it('should extract an extra description from a multi-component body', () => {
+      const data = [
+        {
+          component: 'pkg1',
+          version: Version.parse('1.2.3'),
+          notes: 'some special notes go here',
+        },
+        {
+          component: 'pkg2',
+          version: Version.parse('2.0.0'),
+          notes: 'more special notes go here',
+        },
+      ];
+      const pullRequestBody = new PullRequestBody(data, {
+        extraDescription: 'Some extra description of the release',
+      });
+      const pullRequestBody2 = PullRequestBody.parse(
+        pullRequestBody.toString()
+      );
+      expect(pullRequestBody2?.releaseData).to.eql(data);
+      expect(pullRequestBody2?.extraDescription).to.eql(
+        'Some extra description of the release'
+      );
+    });
   });
 });

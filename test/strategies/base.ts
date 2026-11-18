@@ -545,5 +545,39 @@ describe('Strategy', () => {
       });
       expect(release).to.be.undefined;
     });
+    it('prepends an extra description to the release notes', async () => {
+      const strategy = new TestStrategy({
+        targetBranch: 'main',
+        github,
+        component: 'google-cloud-automl',
+      });
+      const release = await strategy.buildRelease({
+        title: 'chore(main): release google-cloud-automl v1.2.3',
+        headBranchName:
+          'release-please--branches--main--components--google-cloud-automl',
+        baseBranchName: 'main',
+        number: 1234,
+        body: new PullRequestBody(
+          [
+            {
+              component: 'google-cloud-automl',
+              version: Version.parse('1.2.3'),
+              notes:
+                '## [1.2.3](https://github.com/fake/repo/compare/v1.2.2...v1.2.3) (2024-01-01)\n\nsome notes',
+            },
+          ],
+          {
+            extraDescription: 'Some extra description of the release',
+          }
+        ).toString(),
+        labels: [],
+        files: [],
+        sha: 'abc123',
+      });
+      expect(release, 'Release').to.not.be.undefined;
+      expect(release!.notes).to.eql(
+        'Some extra description of the release\n\n## [1.2.3](https://github.com/fake/repo/compare/v1.2.2...v1.2.3) (2024-01-01)\n\nsome notes'
+      );
+    });
   });
 });

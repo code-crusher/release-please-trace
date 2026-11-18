@@ -23,6 +23,7 @@ import {TagName} from './util/tag-name';
 import {Repository} from './repository';
 import {BranchName} from './util/branch-name';
 import {PullRequestTitle} from './util/pull-request-title';
+import {extractExtraDescription} from './util/pull-request-body';
 import {ReleasePullRequest} from './release-pull-request';
 import {
   buildStrategy,
@@ -1047,6 +1048,7 @@ export class Manifest {
         openPullRequest.headBranchName === pullRequest.headRefName
     );
     if (existing) {
+      this.carryForwardExtraDescription(existing, pullRequest);
       return this.alwaysUpdate
         ? await this.updateExistingPullRequest(existing, pullRequest)
         : await this.maybeUpdateExistingPullRequest(existing, pullRequest);
@@ -1058,6 +1060,7 @@ export class Manifest {
         openPullRequest.headBranchName === pullRequest.headRefName
     );
     if (snoozed) {
+      this.carryForwardExtraDescription(snoozed, pullRequest);
       return this.alwaysUpdate
         ? await this.updateExistingPullRequest(snoozed, pullRequest)
         : await this.maybeUpdateSnoozedPullRequest(snoozed, pullRequest);
@@ -1125,6 +1128,23 @@ export class Manifest {
     // TODO: consider leaving the snooze label
     await this.github.removeIssueLabels([SNOOZE_LABEL], snoozed.number);
     return updatedPullRequest;
+  }
+
+  /**
+   * Preserve any user-provided extra description from an existing pull
+   * request body so that edits are not lost when the body is regenerated.
+   *
+   * @param {PullRequest} existing The existing pull request
+   * @param {ReleasePullRequest} pullRequest The newly generated pull request
+   */
+  private carryForwardExtraDescription(
+    existing: PullRequest,
+    pullRequest: ReleasePullRequest
+  ) {
+    const {extraDescription} = extractExtraDescription(existing.body);
+    if (extraDescription) {
+      pullRequest.body.extraDescription = extraDescription;
+    }
   }
 
   /// force an update to an existing pull request

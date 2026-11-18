@@ -1,3 +1,18 @@
+exports['PullRequestBody toString can handle a custom extra description 1'] = `
+:robot: I have created a release *beep* *boop*
+---
+
+
+<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->
+Some extra description of the release
+<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->
+
+some special notes go here
+
+---
+This PR was generated with [Release Please](https://github.com/googleapis/release-please). See [documentation](https://github.com/googleapis/release-please#release-please).
+`
+
 exports['PullRequestBody toString can handle a custom header and footer 1'] = `
 My special header!!!
 ---

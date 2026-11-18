@@ -4373,6 +4373,179 @@ describe('Manifest', () => {
       expect(pullRequestNumbers).lengthOf(1);
     });
 
+    it('preserves an extra description from an existing pull request', async function () {
+      sandbox
+        .stub(github, 'getFileContentsOnBranch')
+        .withArgs('README.md', 'main')
+        .resolves(buildGitHubFileRaw('some-content'));
+      stubSuggesterWithSnapshot(sandbox, this.test!.fullTitle());
+      mockPullRequests(
+        github,
+        [
+          {
+            number: 22,
+            title: 'pr title1',
+            body: new PullRequestBody(
+              [
+                {
+                  notes: 'Some release notes',
+                },
+              ],
+              {
+                extraDescription: 'My custom description',
+              }
+            ).toString(),
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            labels: ['autorelease: pending'],
+            files: [],
+          },
+        ],
+        []
+      );
+      const updatePullRequestStub = sandbox
+        .stub(github, 'updatePullRequest')
+        .withArgs(22, sinon.match.any, sinon.match.any, sinon.match.any)
+        .resolves({
+          number: 22,
+          title: 'pr title1',
+          body: 'pr body1',
+          headBranchName: 'release-please/branches/main',
+          baseBranchName: 'main',
+          labels: [],
+          files: [],
+        });
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          'path/a': {
+            releaseType: 'node',
+            component: 'pkg1',
+          },
+          'path/b': {
+            releaseType: 'node',
+            component: 'pkg2',
+          },
+        },
+        {
+          'path/a': Version.parse('1.0.0'),
+          'path/b': Version.parse('0.2.3'),
+        },
+        {
+          separatePullRequests: true,
+          plugins: ['node-workspace'],
+        }
+      );
+      sandbox.stub(manifest, 'buildPullRequests').resolves([
+        {
+          title: PullRequestTitle.ofTargetBranch('main'),
+          body: new PullRequestBody([
+            {
+              notes: 'Some release notes',
+            },
+          ]),
+          updates: [
+            {
+              path: 'README.md',
+              createIfMissing: false,
+              updater: new RawContent('some raw content'),
+            },
+          ],
+          labels: [],
+          headRefName: 'release-please/branches/main',
+          draft: false,
+        },
+      ]);
+      const pullRequestNumbers = await manifest.createPullRequests();
+      expect(pullRequestNumbers).lengthOf(1);
+      const updatedPullRequest = updatePullRequestStub.firstCall.args[1];
+      expect(updatedPullRequest.body.extraDescription).to.eql(
+        'My custom description'
+      );
+    });
+
+    it('ignores an existing pull request with an extra description but no other changes', async function () {
+      const notes =
+        '## [1.0.0](https://github.com/fake/repo/compare/v0.9.0...v1.0.0) (2024-01-01)\n\n### Features\n\n* some feature';
+      const existingBody = new PullRequestBody(
+        [
+          {
+            notes,
+          },
+        ],
+        {
+          extraDescription: 'My custom description',
+        }
+      );
+      sandbox
+        .stub(github, 'getFileContentsOnBranch')
+        .withArgs('README.md', 'main')
+        .resolves(buildGitHubFileRaw('some-content'));
+      stubSuggesterWithSnapshot(sandbox, this.test!.fullTitle());
+      mockPullRequests(
+        github,
+        [
+          {
+            number: 22,
+            title: 'pr title1',
+            body: existingBody.toString(),
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            labels: ['autorelease: pending'],
+            files: [],
+          },
+        ],
+        []
+      );
+      const updatePullRequestStub = sandbox.stub(github, 'updatePullRequest');
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          'path/a': {
+            releaseType: 'node',
+            component: 'pkg1',
+          },
+          'path/b': {
+            releaseType: 'node',
+            component: 'pkg2',
+          },
+        },
+        {
+          'path/a': Version.parse('1.0.0'),
+          'path/b': Version.parse('0.2.3'),
+        },
+        {
+          separatePullRequests: true,
+          plugins: ['node-workspace'],
+        }
+      );
+      sandbox.stub(manifest, 'buildPullRequests').resolves([
+        {
+          title: PullRequestTitle.ofTargetBranch('main'),
+          body: new PullRequestBody([
+            {
+              notes,
+            },
+          ]),
+          updates: [
+            {
+              path: 'README.md',
+              createIfMissing: false,
+              updater: new RawContent('some raw content'),
+            },
+          ],
+          labels: [],
+          headRefName: 'release-please/branches/main',
+          draft: false,
+        },
+      ]);
+      const pullRequestNumbers = await manifest.createPullRequests();
+      expect(pullRequestNumbers).lengthOf(0);
+      expect(updatePullRequestStub.called).to.be.false;
+    });
+
     describe('with an overflowing body', () => {
       const body = new PullRequestBody(mockReleaseData(1000), {
         useComponents: true,

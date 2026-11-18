@@ -688,9 +688,13 @@ export abstract class BaseStrategy implements Strategy {
       }
     }
 
-    const notes = releaseData?.notes;
+    let notes = releaseData?.notes;
     if (notes === undefined) {
       this.logger.warn('Failed to find release notes');
+    }
+    if (pullRequestBody.extraDescription) {
+      // Prepend the user-provided description to the release notes
+      notes = `${pullRequestBody.extraDescription}\n\n${notes ?? ''}`.trim();
     }
 
     let version: Version | undefined = pullRequestTitle.getVersion();

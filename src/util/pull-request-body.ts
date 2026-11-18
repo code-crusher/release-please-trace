@@ -20,24 +20,29 @@ const DEFAULT_HEADER = ':robot: I have created a release *beep* *boop*';
 const DEFAULT_FOOTER =
   'This PR was generated with [Release Please](https://github.com/googleapis/release-please). See [documentation](https://github.com/googleapis/release-please#release-please).';
 const NOTES_DELIMITER = '---';
+const EXTRA_DESCRIPTION_BEGIN = '<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->';
+const EXTRA_DESCRIPTION_END = '<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->';
 
 interface PullRequestBodyOptions {
   header?: string;
   footer?: string;
   extra?: string;
   useComponents?: boolean;
+  extraDescription?: string;
 }
 
 export class PullRequestBody {
   header: string;
   footer: string;
   extra?: string;
+  extraDescription?: string;
   releaseData: ReleaseData[];
   useComponents: boolean;
   constructor(releaseData: ReleaseData[], options?: PullRequestBodyOptions) {
     this.header = options?.header || DEFAULT_HEADER;
     this.footer = options?.footer || DEFAULT_FOOTER;
     this.extra = options?.extra;
+    this.extraDescription = options?.extraDescription;
     this.releaseData = releaseData;
     this.useComponents = options?.useComponents ?? this.releaseData.length > 1;
   }
@@ -45,7 +50,10 @@ export class PullRequestBody {
     body: string,
     logger: Logger = defaultLogger
   ): PullRequestBody | undefined {
-    const parts = splitBody(body);
+    // Extract any user-provided description before parsing the release notes
+    // so that it is not mistaken for generated release notes.
+    const {extraDescription, content} = extractExtraDescription(body);
+    const parts = splitBody(content);
     if (!parts) {
       logger.error('Pull request body did not match');
       return undefined;
@@ -63,11 +71,13 @@ export class PullRequestBody {
       header: parts.header,
       footer: parts.footer,
       useComponents,
+      extraDescription,
     });
   }
   notes(): string {
+    let generatedNotes: string;
     if (this.useComponents) {
-      return this.releaseData
+      generatedNotes = this.releaseData
         .map(release => {
           return `<details><summary>${
             release.component ? `${release.component}: ` : ''
@@ -76,8 +86,16 @@ export class PullRequestBody {
           }\n</details>`;
         })
         .join('\n\n');
+    } else {
+      generatedNotes = this.releaseData
+        .map(release => release.notes)
+        .join('\n\n');
     }
-    return this.releaseData.map(release => release.notes).join('\n\n');
+    if (!this.extraDescription) {
+      return generatedNotes;
+    }
+    const extraDescription = `${EXTRA_DESCRIPTION_BEGIN}\n${this.extraDescription}\n${EXTRA_DESCRIPTION_END}\n\n`;
+    return extraDescription + generatedNotes;
   }
   toString(): string {
     const notes = this.notes();
@@ -110,6 +128,46 @@ function splitBody(
   return {
     header,
     footer,
+    content,
+  };
+}
+
+/**
+ * Extracts the user-provided extra description from a pull request body.
+ *
+ * The extra description is delimited by `<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->`
+ * and `<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->` comments so that it can be
+ * preserved when the pull request body is regenerated. Multiple blocks are
+ * joined together.
+ *
+ * @param {string} body The raw pull request body
+ * @returns {Object} The extracted description (if any) and the body with the
+ *   description blocks removed
+ */
+export function extractExtraDescription(body: string): {
+  extraDescription?: string;
+  content: string;
+} {
+  const descriptions: string[] = [];
+  let content = body;
+  let beginIndex = content.indexOf(EXTRA_DESCRIPTION_BEGIN);
+  let endIndex = content.indexOf(EXTRA_DESCRIPTION_END);
+  while (beginIndex !== -1 && endIndex > beginIndex) {
+    const description = content
+      .slice(beginIndex + EXTRA_DESCRIPTION_BEGIN.length, endIndex)
+      .trim();
+    if (description) {
+      descriptions.push(description);
+    }
+    content =
+      content.slice(0, beginIndex) +
+      content.slice(endIndex + EXTRA_DESCRIPTION_END.length);
+    beginIndex = content.indexOf(EXTRA_DESCRIPTION_BEGIN);
+    endIndex = content.indexOf(EXTRA_DESCRIPTION_END);
+  }
+  return {
+    extraDescription:
+      descriptions.length > 0 ? descriptions.join('\n\n') : undefined,
     content,
   };
 }

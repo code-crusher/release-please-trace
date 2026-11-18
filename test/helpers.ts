@@ -337,6 +337,7 @@ interface MockCandidatePullRequestOptions {
   draft?: boolean;
   labels?: string[];
   group?: string;
+  extraDescription?: string;
 }
 export function buildMockCandidatePullRequest(
   path: string,
@@ -349,15 +350,20 @@ export function buildMockCandidatePullRequest(
     path,
     pullRequest: {
       title: PullRequestTitle.ofTargetBranch('main'),
-      body: new PullRequestBody([
+      body: new PullRequestBody(
+        [
+          {
+            component: options.component,
+            version,
+            notes:
+              options.notes ??
+              `Release notes for path: ${path}, releaseType: ${releaseType}`,
+          },
+        ],
         {
-          component: options.component,
-          version,
-          notes:
-            options.notes ??
-            `Release notes for path: ${path}, releaseType: ${releaseType}`,
-        },
-      ]),
+          extraDescription: options.extraDescription,
+        }
+      ),
       updates: options.updates ?? [],
       labels: options.labels ?? [],
       headRefName: BranchName.ofTargetBranch('main').toString(),

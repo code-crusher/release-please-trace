@@ -134,6 +134,24 @@ option in the manifest configuration.
 By default, the pull request footer is:
 `This PR was generated with Release Please. See documentation.`.
 
+### Adding a custom release description
+
+You can add your own description to a release pull request by editing the
+pull request body and adding a block between these HTML comment markers:
+
+```md
+<!-- RELEASE_PLEASE_EXTRA_DESCRIPTION -->
+This text is preserved across pull request updates and is added to the
+GitHub release notes.
+<!-- /RELEASE_PLEASE_EXTRA_DESCRIPTION -->
+```
+
+Release Please preserves the text between the markers when it regenerates the
+pull request body, so any later commits do not wipe out your edits. The
+description is rendered above the generated release notes in the pull request
+body and is prepended to the release notes of the GitHub release created when
+the pull request is merged.
+
 ## Release Lifecycle Labels
 
 By default, we open release pull requests with the `autorelease: pending`

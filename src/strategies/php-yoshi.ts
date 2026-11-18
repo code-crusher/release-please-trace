@@ -247,6 +247,7 @@ export class PHPYoshi extends BaseStrategy {
     return new PullRequestBody([{component, notes}], {
       footer: body.footer,
       header: body.header,
+      extraDescription: body.extraDescription,
     });
   }
 

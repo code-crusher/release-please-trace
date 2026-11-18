@@ -91,6 +91,7 @@ export class Merge extends ManifestPlugin {
     const labels = new Set<string>();
     let rawUpdates: Update[] = [];
     let rootRelease: CandidateReleasePullRequest | null = null;
+    const extraDescriptions: string[] = [];
     for (const candidate of inScopeCandidates) {
       const pullRequest = candidate.pullRequest;
       rawUpdates = rawUpdates.concat(...pullRequest.updates);
@@ -98,6 +99,9 @@ export class Merge extends ManifestPlugin {
         labels.add(label);
       }
       releaseData.push(...pullRequest.body.releaseData);
+      if (pullRequest.body.extraDescription) {
+        extraDescriptions.push(pullRequest.body.extraDescription);
+      }
       if (candidate.path === '.') {
         rootRelease = candidate;
       }
@@ -116,6 +120,10 @@ export class Merge extends ManifestPlugin {
         useComponents: true,
         header: this.pullRequestHeader,
         footer: this.pullRequestFooter,
+        extraDescription:
+          extraDescriptions.length > 0
+            ? extraDescriptions.join('\n\n')
+            : undefined,
       }),
       updates,
       labels: Array.from(labels),
