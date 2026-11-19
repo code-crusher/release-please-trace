@@ -111,6 +111,10 @@
           "description": "Include commit authors in changelog entries (e.g., `(@username)`). Defaults to `false`.",
           "type": "boolean"
         },
+        "include-dependency-release-notes": {
+          "description": "Include the upstream release notes from dependency update pull requests in the changelog entries. Defaults to `false`.",
+          "type": "boolean"
+        },
         "pull-request-title-pattern": {
           "description": "Customize the release pull request title.",
           "type": "string"
@@ -495,6 +499,7 @@
     "changelog-host": true,
     "changelog-path": true,
     "include-commit-authors": true,
+    "include-dependency-release-notes": true,
     "pull-request-title-pattern": true,
     "pull-request-header": true,
     "pull-request-footer": true,

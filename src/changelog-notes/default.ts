@@ -18,12 +18,21 @@ import {
   BuildNotesOptions,
 } from '../changelog-notes';
 import {ConventionalCommit} from '../commit';
+import {
+  extractDependencyReleaseNotes,
+  matchDependencyUpdate,
+} from '../util/dependency-update';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const conventionalChangelogWriter = require('conventional-changelog-writer');
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const presetFactory = require('conventional-changelog-conventionalcommits');
 const DEFAULT_HOST = 'https://github.com';
+
+// Appends the upstream release notes carried by a dependency update
+// commit (e.g. a Renovate pull request) below the changelog entry.
+const DEPENDENCY_RELEASE_NOTES_PARTIAL =
+  '{{#if dependencyReleaseNotes}}\n\n{{{dependencyReleaseNotes}}}\n\n{{/if}}';
 
 interface DefaultChangelogNotesOptions {
   commitPartial?: string;
@@ -69,9 +78,13 @@ export class DefaultChangelogNotes implements ChangelogNotes {
     const preset = await presetFactory(config);
     // Replace the default ", closes" keyword with ", refs" to prevent GitHub from
     // automatically closing referenced issues when the release PR is merged.
-    preset.writerOpts.commitPartial =
+    let commitPartial =
       this.commitPartial ||
       preset.writerOpts.commitPartial?.replace(/,\s*closes/g, ', refs');
+    if (options.includeDependencyReleaseNotes) {
+      commitPartial = `${commitPartial}${DEPENDENCY_RELEASE_NOTES_PARTIAL}`;
+    }
+    preset.writerOpts.commitPartial = commitPartial;
     preset.writerOpts.headerPartial =
       this.headerPartial || preset.writerOpts.headerPartial;
     preset.writerOpts.mainTemplate =
@@ -95,6 +108,15 @@ export class DefaultChangelogNotes implements ChangelogNotes {
           : commit.author.name;
         subject = `${subject} (${authorDisplay})`;
       }
+      let dependencyReleaseNotes: string | undefined;
+      if (
+        options.includeDependencyReleaseNotes &&
+        matchDependencyUpdate(commit)
+      ) {
+        dependencyReleaseNotes = extractDependencyReleaseNotes(
+          commit.pullRequest?.body
+        );
+      }
       return {
         body: '', // commit.body,
         subject,
@@ -111,6 +133,7 @@ export class DefaultChangelogNotes implements ChangelogNotes {
           .map(note => `Release-As: ${note.text}`)
           .join('\n'),
         hash: commit.sha,
+        dependencyReleaseNotes,
       };
     });
 

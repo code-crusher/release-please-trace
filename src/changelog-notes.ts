@@ -25,6 +25,7 @@ export interface BuildNotesOptions {
   changelogSections?: ChangelogSection[];
   commits?: Commit[];
   includeCommitAuthors?: boolean;
+  includeDependencyReleaseNotes?: boolean;
 }
 
 export interface ChangelogNotes {

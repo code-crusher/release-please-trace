@@ -35,6 +35,13 @@ update should reflect the proposed version bump of the BOM artifact.
 For example, a major version bump in a dependency should bump the BOM artifact's
 version with an associated major version bump.
 
+A BOM release is only interesting to users if it lists what changed in its
+dependencies. Set `"include-dependency-release-notes": true` in your manifest
+config to append the upstream release notes carried by the dependency update
+pull requests (e.g. the `### Release Notes` section of a Renovate PR) to each
+`### Dependencies` changelog entry. This produces a release note candidate that
+a human releaser can then adjust.
+
 ## Java LTS
 
 This is a special case versioning strategy where we adopt a custom versioning scheme

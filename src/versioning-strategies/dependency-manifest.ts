@@ -22,12 +22,7 @@ import {
   MinorVersionUpdate,
   PatchVersionUpdate,
 } from '../versioning-strategy';
-
-const DEPENDENCY_UPDATE_REGEX =
-  /^deps: update dependency (.*) to (v[^\s]*)(\s\(#\d+\))?$/m;
-
-const DEPENDABOT_DEPENDENCY_UPDATE_REGEX =
-  /^(?:chore|build)\(deps\): bump (.*) from [^\s]* to ([^\s]*)(\s\(#\d+\))?$/m;
+import {matchDependencyUpdate} from '../util/dependency-update';
 
 /**
  * This VersioningStrategy looks at `deps` type commits and tries to
@@ -88,19 +83,12 @@ export class DependencyManifest extends DefaultVersioningStrategy {
   }
 }
 
-function matchCommit(commit: ConventionalCommit): RegExpMatchArray | null {
-  return (
-    commit.message.match(DEPENDENCY_UPDATE_REGEX) ||
-    commit.message.match(DEPENDABOT_DEPENDENCY_UPDATE_REGEX)
-  );
-}
-
 function buildDependencyUpdates(
   commits: ConventionalCommit[]
 ): Record<string, Version> {
   const versionsMap: Record<string, Version> = {};
   for (const commit of commits) {
-    const match = matchCommit(commit);
+    const match = matchDependencyUpdate(commit);
     if (!match) continue;
 
     const versionString = match[2];

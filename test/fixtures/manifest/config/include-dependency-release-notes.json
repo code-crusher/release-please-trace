@@ -1,0 +1,13 @@
+{
+  "release-type": "java-bom",
+  "include-dependency-release-notes": true,
+  "packages": {
+    ".": {
+      "component": "root"
+    },
+    "packages/bot-config-utils": {
+      "component": "bot-config-utils",
+      "include-dependency-release-notes": false
+    }
+  }
+}

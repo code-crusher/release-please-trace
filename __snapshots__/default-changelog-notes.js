@@ -271,3 +271,41 @@ exports['DefaultChangelogNotes buildNotes with commit parsing should parse multi
 
 * some bugfix ([2ec0e9b](https://github.com/googleapis/java-asset/commit/2ec0e9bc0ba7deaf762dae213667bf42))
 `
+
+exports['DefaultChangelogNotes buildNotes with commit parsing with dependency release notes should handle dependency updates without release notes 1'] = `
+## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
+
+
+### Dependencies
+
+* update dependency com.google.cloud:google-cloud-bigtable to v1.20.0 ([sha1](https://github.com/googleapis/java-asset/commit/sha1))
+`
+
+exports['DefaultChangelogNotes buildNotes with commit parsing with dependency release notes should include dependency release notes when enabled 1'] = `
+## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
+
+
+### Dependencies
+
+* update dependency com.google.cloud:google-cloud-bigtable to v1.20.0 ([sha1](https://github.com/googleapis/java-asset/commit/sha1))
+
+<details>some release notes</details>
+`
+
+exports['DefaultChangelogNotes buildNotes with commit parsing with dependency release notes should not include dependency release notes by default 1'] = `
+## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
+
+
+### Dependencies
+
+* update dependency com.google.cloud:google-cloud-bigtable to v1.20.0 ([sha1](https://github.com/googleapis/java-asset/commit/sha1))
+`
+
+exports['DefaultChangelogNotes buildNotes with commit parsing with dependency release notes should not include release notes for non-dependency commits 1'] = `
+## [1.2.3](https://github.com/googleapis/java-asset/compare/v1.2.2...v1.2.3) (1983-10-10)
+
+
+### Features
+
+* a new feature ([sha1](https://github.com/googleapis/java-asset/commit/sha1))
+`

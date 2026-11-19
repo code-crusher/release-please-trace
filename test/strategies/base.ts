@@ -29,6 +29,7 @@ import {
   buildMockConventionalCommit,
 } from '../helpers';
 import {GenericJson} from '../../src/updaters/generic-json';
+import {parseConventionalCommits} from '../../src/commit';
 import {Generic} from '../../src/updaters/generic';
 import {GenericXml} from '../../src/updaters/generic-xml';
 import {PomXml} from '../../src/updaters/java/pom-xml';
@@ -91,6 +92,96 @@ describe('Strategy', () => {
       expect(pullRequest).to.not.be.undefined;
       expect(pullRequest?.version?.toString()).to.eql('0.1.0');
       snapshot(dateSafe(pullRequest!.body.toString()));
+    });
+    it('includes dependency release notes when enabled', async () => {
+      const strategy = new TestStrategy({
+        targetBranch: 'main',
+        github,
+        component: 'google-cloud-automl',
+        includeDependencyReleaseNotes: true,
+        changelogSections: [
+          {type: 'feat', section: 'Features'},
+          {type: 'deps', section: 'Dependencies'},
+        ],
+      });
+      const commits = parseConventionalCommits([
+        {
+          sha: 'abc123',
+          message:
+            'deps: update dependency com.google.cloud:google-cloud-bigtable to v1.20.0 (#1095)',
+          files: ['pom.xml'],
+          pullRequest: {
+            headBranchName: 'renovate/google-cloud-bigtable-1.x',
+            baseBranchName: 'main',
+            number: 1095,
+            title:
+              'deps: update dependency com.google.cloud:google-cloud-bigtable to v1.20.0',
+            body: [
+              'This PR contains the following updates:',
+              '',
+              '---',
+              '',
+              '### Release Notes',
+              '',
+              '<details>',
+              '<summary>googleapis/java-bigtable</summary>',
+              '',
+              '##### Features',
+              '',
+              '-   Surface the server-timing metric',
+              '',
+              '</details>',
+              '',
+              '---',
+              '',
+              '### Renovate configuration',
+            ].join('\n'),
+            labels: [],
+            files: ['pom.xml'],
+          },
+        },
+      ]);
+      const pullRequest = await strategy.buildReleasePullRequest(commits);
+      expect(pullRequest).to.not.be.undefined;
+      expect(pullRequest!.body.toString()).to.include(
+        '<summary>googleapis/java-bigtable</summary>'
+      );
+      expect(pullRequest!.body.toString()).to.not.include(
+        'Renovate configuration'
+      );
+      snapshot(dateSafe(pullRequest!.body.toString()));
+    });
+    it('does not include dependency release notes by default', async () => {
+      const strategy = new TestStrategy({
+        targetBranch: 'main',
+        github,
+        component: 'google-cloud-automl',
+        changelogSections: [
+          {type: 'feat', section: 'Features'},
+          {type: 'deps', section: 'Dependencies'},
+        ],
+      });
+      const commits = parseConventionalCommits([
+        {
+          sha: 'abc123',
+          message:
+            'deps: update dependency com.google.cloud:google-cloud-bigtable to v1.20.0 (#1095)',
+          files: ['pom.xml'],
+          pullRequest: {
+            headBranchName: 'renovate/google-cloud-bigtable-1.x',
+            baseBranchName: 'main',
+            number: 1095,
+            title:
+              'deps: update dependency com.google.cloud:google-cloud-bigtable to v1.20.0',
+            body: '### Release Notes\n\n<details>some release notes</details>',
+            labels: [],
+            files: ['pom.xml'],
+          },
+        },
+      ]);
+      const pullRequest = await strategy.buildReleasePullRequest(commits);
+      expect(pullRequest).to.not.be.undefined;
+      expect(pullRequest!.body.toString()).to.not.include('some release notes');
     });
     it('updates extra files', async () => {
       const strategy = new TestStrategy({

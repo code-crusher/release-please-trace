@@ -711,6 +711,38 @@ describe('Manifest', () => {
       ).to.eql('default');
     });
 
+    it('should read include dependency release notes from manifest', async () => {
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('release-please-config.json', 'main')
+        .resolves(
+          buildGitHubFileContent(
+            fixturesPath,
+            'manifest/config/include-dependency-release-notes.json'
+          )
+        )
+        .withArgs('.release-please-manifest.json', 'main')
+        .resolves(
+          buildGitHubFileContent(
+            fixturesPath,
+            'manifest/versions/versions.json'
+          )
+        );
+      const manifest = await Manifest.fromManifest(
+        github,
+        github.repository.defaultBranch
+      );
+      expect(manifest.repositoryConfig['.'].includeDependencyReleaseNotes).to.be
+        .true;
+      expect(
+        manifest.repositoryConfig['packages/bot-config-utils']
+          .includeDependencyReleaseNotes
+      ).to.be.false;
+    });
+
     it('should read changelog path from manifest', async () => {
       const getFileContentsStub = sandbox.stub(
         github,

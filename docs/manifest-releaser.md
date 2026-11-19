@@ -194,6 +194,13 @@ defaults (those are documented in comments)
   // absence defaults to false
   "include-commit-authors": true,
 
+  // include the upstream release notes from dependency update pull requests
+  // in the changelog entries. Useful for BOM style releases that aggregate
+  // dependency updates, e.g. a Renovate `deps:` commit whose pull request
+  // body contains a `### Release Notes` section.
+  // absence defaults to false
+  "include-dependency-release-notes": true,
+
   // when `manifest-release` creates GitHub Releases per package, create
   // those as "Draft" releases (which can later be manually published).
   // absence defaults to false and Releases are created as already Published.

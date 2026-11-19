@@ -75,6 +75,7 @@ function releaserConfigToJsonConfig(
     'include-v-in-release-name': config.includeVInReleaseName,
     'changelog-type': config.changelogType,
     'changelog-host': config.changelogHost,
+    'include-dependency-release-notes': config.includeDependencyReleaseNotes,
     'pull-request-title-pattern': config.pullRequestTitlePattern,
     'pull-request-header': config.pullRequestHeader,
     'pull-request-footer': config.pullRequestFooter,

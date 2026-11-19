@@ -89,6 +89,7 @@ export interface BaseStrategyOptions {
   extraLabels?: string[];
   dateFormat?: string;
   includeCommitAuthors?: boolean;
+  includeDependencyReleaseNotes?: boolean;
 }
 
 /**
@@ -122,6 +123,7 @@ export abstract class BaseStrategy implements Strategy {
   readonly extraLabels: string[];
   protected dateFormat: string;
   protected includeCommitAuthors?: boolean;
+  protected includeDependencyReleaseNotes?: boolean;
 
   readonly changelogNotes: ChangelogNotes;
 
@@ -161,6 +163,7 @@ export abstract class BaseStrategy implements Strategy {
     this.extraLabels = options.extraLabels || [];
     this.dateFormat = options.dateFormat || DEFAULT_DATE_FORMAT;
     this.includeCommitAuthors = options.includeCommitAuthors;
+    this.includeDependencyReleaseNotes = options.includeDependencyReleaseNotes;
   }
 
   /**
@@ -236,6 +239,7 @@ export abstract class BaseStrategy implements Strategy {
       changelogSections: this.changelogSections,
       commits: commits,
       includeCommitAuthors: this.includeCommitAuthors,
+      includeDependencyReleaseNotes: this.includeDependencyReleaseNotes,
     });
   }
 

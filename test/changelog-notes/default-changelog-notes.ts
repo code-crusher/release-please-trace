@@ -20,7 +20,7 @@ import {
   safeSnapshot,
 } from '../helpers';
 import {DefaultChangelogNotes} from '../../src/changelog-notes/default';
-import {parseConventionalCommits} from '../../src/commit';
+import {ConventionalCommit, parseConventionalCommits} from '../../src/commit';
 import {PullRequestBody} from '../../src/util/pull-request-body';
 import {Version} from '../../src/version';
 
@@ -344,6 +344,110 @@ describe('DefaultChangelogNotes', () => {
         expect(notes).to.is.string;
         expect(notes).to.include('Test User');
         safeSnapshot(notes);
+      });
+      describe('with dependency release notes', () => {
+        const dependencyUpdateCommit = (
+          dependencyReleaseNotes?: string
+        ): ConventionalCommit => ({
+          sha: 'sha1',
+          message:
+            'deps: update dependency com.google.cloud:google-cloud-bigtable to v1.20.0',
+          files: ['pom.xml'],
+          type: 'deps',
+          scope: null,
+          bareMessage:
+            'update dependency com.google.cloud:google-cloud-bigtable to v1.20.0',
+          notes: [],
+          references: [],
+          breaking: false,
+          pullRequest: dependencyReleaseNotes
+            ? {
+                headBranchName: 'renovate/google-cloud-bigtable-1.x',
+                baseBranchName: 'main',
+                number: 1095,
+                title:
+                  'deps: update dependency com.google.cloud:google-cloud-bigtable to v1.20.0',
+                body: [
+                  'This PR contains the following updates:',
+                  '',
+                  '---',
+                  '',
+                  '### Release Notes',
+                  '',
+                  dependencyReleaseNotes,
+                  '',
+                  '---',
+                  '',
+                  '### Renovate configuration',
+                ].join('\n'),
+                labels: [],
+                files: ['pom.xml'],
+              }
+            : undefined,
+        });
+
+        const dependencyNotesOptions = {
+          ...notesOptions,
+          changelogSections: [
+            {type: 'feat', section: 'Features'},
+            {type: 'deps', section: 'Dependencies'},
+          ],
+        };
+        it('should include dependency release notes when enabled', async () => {
+          const commits = [
+            dependencyUpdateCommit('<details>some release notes</details>'),
+          ];
+          const changelogNotes = new DefaultChangelogNotes();
+          const notes = await changelogNotes.buildNotes(commits, {
+            ...dependencyNotesOptions,
+            includeDependencyReleaseNotes: true,
+          });
+          expect(notes).to.include('<details>some release notes</details>');
+          safeSnapshot(notes);
+        });
+        it('should not include dependency release notes by default', async () => {
+          const commits = [
+            dependencyUpdateCommit('<details>some release notes</details>'),
+          ];
+          const changelogNotes = new DefaultChangelogNotes();
+          const notes = await changelogNotes.buildNotes(
+            commits,
+            dependencyNotesOptions
+          );
+          expect(notes).to.not.include('<details>some release notes</details>');
+          safeSnapshot(notes);
+        });
+        it('should not include release notes for non-dependency commits', async () => {
+          const commits = [
+            {
+              ...dependencyUpdateCommit(
+                '<details>some release notes</details>'
+              ),
+              message: 'feat: a new feature',
+              type: 'feat',
+              bareMessage: 'a new feature',
+            },
+          ];
+          const changelogNotes = new DefaultChangelogNotes();
+          const notes = await changelogNotes.buildNotes(commits, {
+            ...dependencyNotesOptions,
+            includeDependencyReleaseNotes: true,
+          });
+          expect(notes).to.not.include('<details>some release notes</details>');
+          safeSnapshot(notes);
+        });
+        it('should handle dependency updates without release notes', async () => {
+          const commits = [dependencyUpdateCommit()];
+          const changelogNotes = new DefaultChangelogNotes();
+          const notes = await changelogNotes.buildNotes(commits, {
+            ...dependencyNotesOptions,
+            includeDependencyReleaseNotes: true,
+          });
+          expect(notes).to.include(
+            'update dependency com.google.cloud:google-cloud-bigtable to v1.20.0'
+          );
+          safeSnapshot(notes);
+        });
       });
       it('should not include commit authors when disabled', async () => {
         const commits = [

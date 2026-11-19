@@ -30,6 +30,31 @@ exports['Strategy buildReleasePullRequest allows overriding initial version in b
 This PR was generated with [Release Please](https://github.com/googleapis/release-please). See [documentation](https://github.com/googleapis/release-please#release-please).
 `
 
+exports['Strategy buildReleasePullRequest includes dependency release notes when enabled 1'] = `
+:robot: I have created a release *beep* *boop*
+---
+
+
+## 1.0.0 (1983-10-10)
+
+
+### Dependencies
+
+* update dependency com.google.cloud:google-cloud-bigtable to v1.20.0 ([#1095](https://github.com/googleapis/base-test-repo/issues/1095)) ([abc123](https://github.com/googleapis/base-test-repo/commit/abc123))
+
+<details>
+<summary>googleapis/java-bigtable</summary>
+
+##### Features
+
+-   Surface the server-timing metric
+
+</details>
+
+---
+This PR was generated with [Release Please](https://github.com/googleapis/release-please). See [documentation](https://github.com/googleapis/release-please#release-please).
+`
+
 exports['Strategy buildReleasePullRequest should pass changelogHost to default buildNotes 1'] = `
 :robot: I have created a release *beep* *boop*
 ---

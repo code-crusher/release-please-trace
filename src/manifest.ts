@@ -133,6 +133,7 @@ export interface ReleaserConfig {
   changelogType?: ChangelogNotesType;
   changelogHost?: string;
   includeCommitAuthors?: boolean;
+  includeDependencyReleaseNotes?: boolean;
 
   // Ruby-only
   versionFile?: string;
@@ -181,6 +182,7 @@ interface ReleaserConfigJson {
   'changelog-type'?: ChangelogNotesType;
   'changelog-host'?: string;
   'include-commit-authors'?: boolean;
+  'include-dependency-release-notes'?: boolean;
   'pull-request-title-pattern'?: string;
   'pull-request-header'?: string;
   'pull-request-footer'?: string;
@@ -1401,6 +1403,7 @@ function extractReleaserConfig(
     changelogPath: config['changelog-path'],
     changelogHost: config['changelog-host'],
     includeCommitAuthors: config['include-commit-authors'],
+    includeDependencyReleaseNotes: config['include-dependency-release-notes'],
     releaseAs: config['release-as'],
     skipGithubRelease: config['skip-github-release'],
     skipChangelog: config['skip-changelog'],
@@ -1760,6 +1763,9 @@ function mergeReleaserConfig(
     changelogType: pathConfig.changelogType ?? defaultConfig.changelogType,
     includeCommitAuthors:
       pathConfig.includeCommitAuthors ?? defaultConfig.includeCommitAuthors,
+    includeDependencyReleaseNotes:
+      pathConfig.includeDependencyReleaseNotes ??
+      defaultConfig.includeDependencyReleaseNotes,
     releaseAs: pathConfig.releaseAs ?? defaultConfig.releaseAs,
     skipGithubRelease:
       pathConfig.skipGithubRelease ?? defaultConfig.skipGithubRelease,
