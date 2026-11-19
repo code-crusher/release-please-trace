@@ -47,6 +47,8 @@ import {
 } from './util/pull-request-overflow-handler';
 import {signoffCommitMessage} from './util/signoff-commit-message';
 import {CommitExclude} from './util/commit-exclude';
+import {Notifier, NotifyingScm} from './notifiers';
+import {buildNotifier, NotifierConfig} from './factories/notifier-factory';
 
 type ExtraGenericFile = {
   type: 'generic';
@@ -220,6 +222,7 @@ export interface ManifestOptions {
   commitBatchSize?: number;
   logger?: Logger;
   dateFormat?: string;
+  notifiers?: NotifierConfig[];
 }
 
 export interface ReleaserPackageConfig extends ReleaserConfigJson {
@@ -269,6 +272,7 @@ export interface ManifestConfig extends ReleaserConfigJson {
   'last-release-sha'?: string;
   'always-link-local'?: boolean;
   plugins?: PluginType[];
+  notifiers?: NotifierConfig[];
   signoff?: string;
   'group-pull-request-title-pattern'?: string;
   'release-search-depth'?: number;
@@ -365,6 +369,8 @@ export class Manifest {
    *   pull request. Defaults to `[autorelease: pending]`
    * @param {string[]} manifestOptions.releaseLabels Labels to apply to a tagged release
    *   pull request. Defaults to `[autorelease: tagged]`
+   * @param {NotifierConfig[]} manifestOptions.notifiers Notifiers to send
+   *   release events to, e.g. a webhook
    */
   constructor(
     github: Scm,
@@ -374,7 +380,12 @@ export class Manifest {
     manifestOptions?: ManifestOptions
   ) {
     this.repository = github.repository;
-    this.github = github;
+    this.logger = manifestOptions?.logger ?? defaultLogger;
+    this.github = wrapWithNotifiers(
+      github,
+      manifestOptions?.notifiers,
+      this.logger
+    );
     this.targetBranch = targetBranch;
     this.repositoryConfig = repositoryConfig;
     this.releasedVersions = releasedVersions;
@@ -405,7 +416,6 @@ export class Manifest {
       manifestOptions?.commitSearchDepth || DEFAULT_COMMIT_SEARCH_DEPTH;
     this.commitBatchSize =
       manifestOptions?.commitBatchSize || DEFAULT_COMMIT_BATCH_SIZE;
-    this.logger = manifestOptions?.logger ?? defaultLogger;
     this.plugins = (manifestOptions?.plugins || []).map(pluginType =>
       buildPlugin({
         type: pluginType,
@@ -1483,6 +1493,7 @@ async function parseConfig(
     commitSearchDepth: config['commit-search-depth'],
     commitBatchSize: config['commit-batch-size'],
     sequentialCalls: config['sequential-calls'],
+    notifiers: config.notifiers,
   };
   return {config: repositoryConfig, options: manifestOptions};
 }
@@ -1586,6 +1597,29 @@ function isPublishedVersion(strategy: Strategy, version: Version): boolean {
   return strategy.isPublishedVersion
     ? strategy.isPublishedVersion(version)
     : true;
+}
+
+/**
+ * Wrap the Scm with a NotifyingScm if notifiers are configured, otherwise
+ * return the given Scm.
+ *
+ * @param {Scm} scm The Scm to wrap
+ * @param {NotifierConfig[]} notifiers Optional. Notifier configurations
+ * @returns {Scm} The wrapped Scm
+ */
+function wrapWithNotifiers(
+  scm: Scm,
+  notifiers: NotifierConfig[] | undefined,
+  logger: Logger
+): Scm {
+  if (!notifiers || notifiers.length === 0) {
+    return scm;
+  }
+  const repository = `${scm.repository.owner}/${scm.repository.repo}`;
+  const builtNotifiers: Notifier[] = notifiers.map(notifier =>
+    buildNotifier({...notifier, repository, logger})
+  );
+  return new NotifyingScm(scm, builtNotifiers, logger);
 }
 
 /**

@@ -1,0 +1,12 @@
+{
+  "release-type": "simple",
+  "notifiers": [
+    {
+      "type": "webhook",
+      "url": "https://example.com/webhook"
+    }
+  ],
+  "packages": {
+    ".": {}
+  }
+}

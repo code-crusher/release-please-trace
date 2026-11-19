@@ -291,3 +291,54 @@ configuration.
   ]
 }
 ```
+
+## Notifiers
+
+Release-please can send notifications about the actions it performs against
+the source control provider, e.g. to integrate with external systems like
+Jira. Notifications are sent after each mutating action (creating a release,
+opening a pull request, commenting on a pull request, ...) and have the
+following JSON shape:
+
+```json
+{
+  "action": "create release",
+  "data": {
+    "id": 123456,
+    "tagName": "my-package-v1.2.3",
+    "sha": "abc123",
+    "url": "https://github.com/foo/bar/releases/tag/my-package-v1.2.3"
+  }
+}
+```
+
+Configure notifiers with the `notifiers` option in the manifest
+configuration:
+
+| Notifier | Description |
+| -------- | ----------- |
+| `webhook` | POSTs the notification as JSON to the configured URL |
+
+```json
+{
+  "notifiers": [
+    {
+      "type": "webhook",
+      "url": "https://example.com/webhook"
+    }
+  ],
+  "packages": {
+    ".": {}
+  }
+}
+```
+
+Notifications are best-effort: if a notifier fails, the failure is logged
+and the release continues. The `webhook` notifier gives up on a response
+after 10 seconds.
+
+### Adding additional notifiers
+
+To add a new notifier, create a new class that implements the
+[`Notifier` interface](/src/notifiers.ts) and register it with the
+[`registerNotifier`](/src/factories/notifier-factory.ts) function.

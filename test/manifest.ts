@@ -55,6 +55,8 @@ import {RequestError} from '@octokit/request-error';
 import * as nock from 'nock';
 import {LinkedVersions} from '../src/plugins/linked-versions';
 import {MavenWorkspace} from '../src/plugins/maven-workspace';
+import {Notification, Notifier} from '../src/notifiers';
+import * as notifierFactory from '../src/factories/notifier-factory';
 const fetch = require('node-fetch');
 
 nock.disableNetConnect();
@@ -388,6 +390,33 @@ describe('Manifest', () => {
           jsonpath: '$.version',
         },
       ]);
+    });
+
+    it('should read notifiers from manifest', async () => {
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('release-please-config.json', 'main')
+        .resolves(
+          buildGitHubFileContent(fixturesPath, 'manifest/config/notifiers.json')
+        )
+        .withArgs('.release-please-manifest.json', 'main')
+        .resolves(
+          buildGitHubFileContent(
+            fixturesPath,
+            'manifest/versions/versions.json'
+          )
+        );
+      const buildNotifierSpy = sandbox.spy(notifierFactory, 'buildNotifier');
+      await Manifest.fromManifest(github, github.repository.defaultBranch);
+      sinon.assert.calledOnceWithExactly(buildNotifierSpy, {
+        type: 'webhook',
+        url: 'https://example.com/webhook',
+        repository: 'fake-owner/fake-repo',
+        logger: sinon.match.any,
+      });
     });
 
     it('should read custom include component in tag from manifest', async () => {
@@ -6175,6 +6204,105 @@ describe('Manifest', () => {
         ['autorelease: pending'],
         1234
       );
+    });
+
+    it('should notify configured notifiers of the created release', async () => {
+      mockPullRequests(
+        github,
+        [],
+        [
+          {
+            headBranchName: 'release-please/branches/main',
+            baseBranchName: 'main',
+            number: 1234,
+            title: 'chore: release main',
+            body: pullRequestBody('release-notes/single-manifest.txt'),
+            labels: ['autorelease: pending'],
+            files: [],
+            sha: 'abc123',
+          },
+        ]
+      );
+      const getFileContentsStub = sandbox.stub(
+        github,
+        'getFileContentsOnBranch'
+      );
+      getFileContentsStub
+        .withArgs('package.json', 'main')
+        .resolves(
+          buildGitHubFileRaw(
+            JSON.stringify({name: '@google-cloud/release-brancher'})
+          )
+        );
+      const expectedRelease = {
+        id: 123456,
+        sha: 'abc123',
+        tagName: 'release-brancher-v1.3.1',
+      };
+      mockCreateRelease(github, [expectedRelease]);
+      sandbox.stub(github, 'commentOnIssue').resolves();
+      sandbox.stub(github, 'addIssueLabels').resolves();
+      sandbox.stub(github, 'removeIssueLabels').resolves();
+
+      const notifications: Notification[] = [];
+      const notifier: Notifier = {
+        send: notification => {
+          notifications.push(notification);
+          return Promise.resolve();
+        },
+      };
+      sandbox.stub(notifierFactory, 'buildNotifier').returns(notifier);
+
+      const manifest = new Manifest(
+        github,
+        'main',
+        {
+          '.': {
+            releaseType: 'node',
+          },
+        },
+        {
+          '.': Version.parse('1.3.1'),
+        },
+        {
+          notifiers: [{type: 'webhook', url: 'https://example.com/webhook'}],
+        }
+      );
+      const releases = await manifest.createReleases();
+      expect(releases).lengthOf(1);
+
+      // notifications are sent for each action taken against the scm, in
+      // the order they were performed
+      expect(notifications).to.eql([
+        {
+          action: 'create release',
+          data: {
+            id: 123456,
+            sha: 'abc123',
+            tagName: 'release-brancher-v1.3.1',
+            notes: 'some release notes',
+            url: 'https://path/to/release',
+            draft: undefined,
+          },
+        },
+        {
+          action: 'comment on issue',
+          data: {
+            number: 1234,
+            comment:
+              '🤖 Created releases:\n\n- [release-brancher-v1.3.1](https://path/to/release)\n\n:sunflower:',
+            url: undefined,
+          },
+        },
+        {
+          action: 'remove issue labels',
+          data: {number: 1234, labels: ['autorelease: pending']},
+        },
+        {
+          action: 'add issue labels',
+          data: {number: 1234, labels: ['autorelease: tagged']},
+        },
+      ]);
     });
 
     it('should handle a multiple manifest release', async () => {

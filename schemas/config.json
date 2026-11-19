@@ -419,6 +419,34 @@
             ]
           }
         },
+        "notifiers": {
+          "description": "Notifiers to send release events to. Notifications are sent after release-please performs an action against the source control provider, e.g. creating a release.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "description": "The name of the notifier for notifiers that do not require other options.",
+                "type": "string"
+              },
+              {
+                "description": "Configuration for the `webhook` notifier.",
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "description": "The name of the notifier.",
+                    "type": "string",
+                    "enum": ["webhook"]
+                  },
+                  "url": {
+                    "description": "URL to send notifications to. The notification is sent as a JSON POST request, e.g. `{\"action\": \"create release\", \"data\": {...}}`",
+                    "type": "string"
+                  }
+                },
+                "required": ["type", "url"]
+              }
+            ]
+          }
+        },
         "signoff": {
           "description": "Text to be used as Signed-off-by in the commit.",
           "type": "string"
@@ -466,6 +494,7 @@
     "last-release-sha": true,
     "always-link-local": true,
     "plugins": true,
+    "notifiers": true,
     "signoff": true,
     "group-pull-request-title-pattern": true,
     "release-search-depth": true,

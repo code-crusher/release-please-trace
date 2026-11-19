@@ -46,6 +46,23 @@ export {
   registerPlugin,
 } from './factories/plugin-factory';
 export {
+  Notifier,
+  Notification,
+  NotifierAction,
+  NotifyingScm,
+} from './notifiers';
+export {WebhookNotifier} from './notifiers/webhook';
+export {
+  NotifierBuilder,
+  NotifierConfig,
+  NotifierFactoryOptions,
+  NotifierType,
+  WebhookNotifierConfig,
+  buildNotifier,
+  getNotifierTypes,
+  registerNotifier,
+} from './factories/notifier-factory';
+export {
   VersioningStrategyBuilder,
   VersioningStrategyFactoryOptions,
   VersioningStrategyType,
