@@ -134,4 +134,41 @@ describe('commit-exclude', () => {
     expect(newCommitsPerPath['a'].length).to.equal(1);
     expect(newCommitsPerPath['d'].length).to.equal(0);
   });
+
+  describe('with additional paths', () => {
+    const createCommit = (files: string[]) => {
+      const first = files[0];
+      return {
+        sha: first.split('/')[0],
+        message: `commit ${first}`,
+        files,
+      };
+    };
+
+    it('should keep commits collected via additional paths when excluding an unrelated path', () => {
+      const commits: Record<string, Commit[]> = {
+        pkg1: [createCommit(['shared/foo.txt', 'other/bar.txt'])],
+      };
+      const config: Record<string, CommitExcludeConfig> = {
+        pkg1: {additionalPaths: ['shared'], excludePaths: ['other']},
+      };
+      const commitExclude = new CommitExclude(config);
+      const newCommitsPerPath = commitExclude.excludeCommits(commits);
+      // the commit has files outside the excluded path, so it is kept
+      expect(newCommitsPerPath['pkg1'].length).to.equal(1);
+    });
+
+    it('should exclude commits that only touch an excluded path', () => {
+      const commits: Record<string, Commit[]> = {
+        pkg1: [createCommit(['other/foo.txt'])],
+      };
+      const config: Record<string, CommitExcludeConfig> = {
+        pkg1: {additionalPaths: ['shared'], excludePaths: ['other']},
+      };
+      const commitExclude = new CommitExclude(config);
+      const newCommitsPerPath = commitExclude.excludeCommits(commits);
+      // the commit only touches an excluded path, so it is dropped
+      expect(newCommitsPerPath['pkg1'].length).to.equal(0);
+    });
+  });
 });

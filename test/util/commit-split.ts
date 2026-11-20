@@ -46,7 +46,7 @@ describe('CommitSplit', () => {
   });
   it('uses path prefixes', () => {
     const commitSplit = new CommitSplit({
-      packagePaths: ['pkg5', 'pkg6/pkg5'],
+      packagePaths: {pkg5: [], 'pkg6/pkg5': []},
     });
     const splitCommits = commitSplit.split(commits);
     expect(splitCommits['pkg1']).to.be.undefined;
@@ -70,7 +70,7 @@ describe('CommitSplit', () => {
       },
     ];
     const commitSplit = new CommitSplit({
-      packagePaths: ['core', 'core/subpackage'],
+      packagePaths: {core: [], 'core/subpackage': []},
     });
     const splitCommits = commitSplit.split(commits);
     expect(splitCommits['core']).lengthOf(1);
@@ -90,7 +90,7 @@ describe('CommitSplit', () => {
     it('should separate commits with limited list of paths', () => {
       const commitSplit = new CommitSplit({
         includeEmpty: true,
-        packagePaths: ['pkg1', 'pkg4'],
+        packagePaths: {pkg1: [], pkg4: []},
       });
       const splitCommits = commitSplit.split(commits);
       expect(splitCommits['pkg1']).lengthOf(3);
@@ -114,13 +114,104 @@ describe('CommitSplit', () => {
     it('should separate commits with limited list of paths', () => {
       const commitSplit = new CommitSplit({
         includeEmpty: false,
-        packagePaths: ['pkg1', 'pkg4'],
+        packagePaths: {pkg1: [], pkg4: []},
       });
       const splitCommits = commitSplit.split(commits);
       expect(splitCommits['pkg1']).lengthOf(2);
       expect(splitCommits['pkg2']).to.be.undefined;
       expect(splitCommits['pkg3']).to.be.undefined;
       expect(splitCommits['pkg4']).to.be.undefined;
+    });
+  });
+
+  describe('with additional paths', () => {
+    const sharedCommits: Commit[] = [
+      {
+        sha: 'abc123',
+        message: 'commit abc123',
+        files: ['pkg1/foo.txt', 'shared/bar.txt'],
+      },
+      {
+        sha: 'def234',
+        message: 'commit def234',
+        files: ['other/baz.txt'],
+      },
+      {
+        sha: 'efg567',
+        message: 'empty files',
+        files: [],
+      },
+    ];
+
+    it('should collect commits from additional paths for multiple packages', () => {
+      // both pkg7 and pkg8 consume code from the shared "shared" folder
+      const commitSplit = new CommitSplit({
+        includeEmpty: false,
+        packagePaths: {pkg7: ['shared'], pkg8: ['shared']},
+      });
+      const splitCommits = commitSplit.split(sharedCommits);
+      expect(splitCommits['pkg7']).lengthOf(1);
+      expect(splitCommits['pkg8']).lengthOf(1);
+    });
+
+    it('should not duplicate a commit for a package matching both its own and an additional path', () => {
+      const commitSplit = new CommitSplit({
+        includeEmpty: false,
+        packagePaths: {pkg7: ['pkg7/nested'], pkg8: ['pkg7']},
+      });
+      const splitCommits = commitSplit.split([
+        {
+          sha: 'abc123',
+          message: 'commit abc123',
+          files: ['pkg7/nested/foo.txt'],
+        },
+      ]);
+      // "pkg7" matches the file via its own path ("pkg7/nested" is under it)
+      // and via its additional path - the commit should only be added once.
+      expect(splitCommits['pkg7']).lengthOf(1);
+      expect(splitCommits['pkg8']).lengthOf(1);
+    });
+
+    it('should prefer the most specific package path', () => {
+      const commitSplit = new CommitSplit({
+        includeEmpty: false,
+        packagePaths: {'pkg7/nested': ['shared'], pkg7: ['shared']},
+      });
+      const splitCommits = commitSplit.split([
+        {
+          sha: 'abc123',
+          message: 'commit abc123',
+          files: ['pkg7/nested/foo.txt'],
+        },
+        {
+          sha: 'def234',
+          message: 'commit def234',
+          files: ['pkg7/foo.txt'],
+        },
+      ]);
+      expect(splitCommits['pkg7/nested']).lengthOf(1);
+      expect(splitCommits['pkg7']).lengthOf(1);
+    });
+
+    it('should apply empty commits to all configured packages', () => {
+      const commitSplit = new CommitSplit({
+        includeEmpty: true,
+        packagePaths: {pkg7: ['shared'], pkg8: ['shared']},
+      });
+      const splitCommits = commitSplit.split(sharedCommits);
+      // the commit touching both pkg1 and shared, plus the empty commit
+      expect(splitCommits['pkg7']).lengthOf(2);
+      expect(splitCommits['pkg8']).lengthOf(2);
+    });
+
+    it('should ignore commits to untracked paths', () => {
+      const commitSplit = new CommitSplit({
+        includeEmpty: false,
+        packagePaths: {pkg7: ['shared'], pkg8: []},
+      });
+      const splitCommits = commitSplit.split(sharedCommits);
+      expect(splitCommits['pkg7']).lengthOf(1);
+      expect(splitCommits['pkg8']).to.be.undefined;
     });
   });
 });

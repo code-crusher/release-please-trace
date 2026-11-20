@@ -318,7 +318,10 @@ defaults (those are documented in comments)
       // overrides release-type for node
       "release-type": "node",
       // create published GitHub Releases on `manifest-release` runs
-      "draft": false
+      "draft": false,
+      // collect commits from these paths in addition to the package path.
+      // Useful for shared code or infrastructure used by this package.
+      "additional-paths": ["path/to/shared", "infra/myJSPkgA"]
     },
 
     "path/to/myJSPkgB": {

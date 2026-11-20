@@ -16,15 +16,24 @@ import {Commit} from '../commit';
 import {ReleaserConfig, ROOT_PROJECT_PATH} from '../manifest';
 import {normalizePaths} from './commit-utils';
 
-export type CommitExcludeConfig = Pick<ReleaserConfig, 'excludePaths'>;
+export type CommitExcludeConfig = Pick<
+  ReleaserConfig,
+  'excludePaths' | 'additionalPaths'
+>;
 
 export class CommitExclude {
   private excludePaths: Record<string, string[]> = {};
+  private additionalPaths: Record<string, string[]> = {};
 
   constructor(config: Record<string, CommitExcludeConfig>) {
     Object.entries(config).forEach(([path, releaseConfig]) => {
       if (releaseConfig.excludePaths) {
         this.excludePaths[path] = normalizePaths(releaseConfig.excludePaths);
+      }
+      if (releaseConfig.additionalPaths) {
+        this.additionalPaths[path] = normalizePaths(
+          releaseConfig.additionalPaths
+        );
       }
     });
   }
@@ -52,8 +61,29 @@ export class CommitExclude {
     return (
       !commit.files ||
       !commit.files
-        .filter(file => this.isRelevant(file, packagePath))
+        .filter(file => this.isPackageFile(file, packagePath))
         .every(file => excludePaths.some(path => this.isRelevant(file, path)))
+    );
+  }
+
+  /**
+   * Returns true if the file belongs to the package at the given path, either
+   * because it lives under the package's own path or under one of the
+   * package's configured additional paths.
+   */
+  private isPackageFile(file: string, packagePath: string): boolean {
+    return (
+      packagePath === ROOT_PROJECT_PATH ||
+      file.indexOf(`${packagePath}/`) === 0 ||
+      this.matchesAdditionalPath(file, packagePath)
+    );
+  }
+
+  private matchesAdditionalPath(file: string, packagePath: string): boolean {
+    const additionalPaths = this.additionalPaths[packagePath];
+    return (
+      !!additionalPaths &&
+      additionalPaths.some(path => file.indexOf(`${path}/`) === 0)
     );
   }
 
