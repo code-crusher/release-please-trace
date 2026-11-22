@@ -59,6 +59,8 @@ export {
 } from './changelog-notes';
 export {Logger, setLogger} from './util/logger';
 export {GitHub} from './github';
+export {Gitea} from './gitea';
+export {Scm} from './scm';
 export const configSchema = require('../../schemas/config.json');
 export const manifestSchema = require('../../schemas/manifest.json');
 

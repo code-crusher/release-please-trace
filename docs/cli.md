@@ -14,6 +14,7 @@ These options are available on all commands.
 | ------ | ---- | ----------- |
 | `--token` | string |REQUIRED. GitHub token with repo write permissions |
 | `--repo-url` | string | REQUIRED. GitHub repository in the format of `<owner>/<repo>` |
+| `--repo-type` | string | Type of the repository hosting service: `github` (the default) or `gitea`. For `gitea`, `--api-url` should point at the Gitea/Forgejo instance, e.g. `https://gitea.com`, and `--token` should be a Gitea access token |
 | `--api-url` | string | Base URI for making REST API requests. Defaults to `https://api.github.com` |
 | `--graphql-url` | string | Base URI for making GraphQL requests. Defaults to `https://api.github.com` |
 | `--target-branch` | string |The branch to open release PRs against and tag releases on. Defaults to the default branch of the repository |

@@ -33,6 +33,7 @@ import {Bootstrapper} from '../bootstrapper';
 import {createPatch} from 'diff';
 import {Scm} from '../scm';
 import {LocalGitHub} from '../local-github';
+import {buildScm, getScmTypes, ScmType} from '../factories/scm-factory';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const parseGithubRepoUrl = require('parse-github-repo-url');
@@ -51,6 +52,7 @@ interface GitHubArgs {
   token?: string;
   apiUrl?: string;
   graphqlUrl?: string;
+  repoType?: ScmType;
   fork?: boolean;
   local?: boolean;
   localPath?: string;
@@ -173,6 +175,15 @@ function gitHubOptions(yargs: yargs.Argv): yargs.Argv {
     .option('graphql-url', {
       describe: 'URL to use when making GraphQL requests',
       default: GH_GRAPHQL_URL,
+      type: 'string',
+    })
+    .option('repo-type', {
+      describe:
+        'Type of the repository hosting service. For `gitea`, ' +
+        '`--api-url` should point at the Gitea/Forgejo instance, ' +
+        'e.g. `https://gitea.com`.',
+      choices: getScmTypes(),
+      default: 'github',
       type: 'string',
     })
     .option('default-branch', {
@@ -850,6 +861,16 @@ async function buildGitHub(argv: GitHubArgs): Promise<Scm> {
       cloneDepth: argv.localCloneDepth,
     });
     return localGitHub;
+  } else if (argv.repoType === 'gitea') {
+    return await buildScm({
+      type: 'gitea',
+      owner,
+      repo,
+      token: argv.token,
+      // a Gitea/Forgejo instance's base URL is the API host
+      apiUrl: argv.apiUrl,
+      defaultBranch: argv.defaultBranch,
+    });
   } else {
     const github = await GitHub.create({
       owner,

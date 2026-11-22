@@ -17,6 +17,11 @@ Options:
                                     [string] [default: "https://api.github.com"]
   --graphql-url                 URL to use when making GraphQL requests
                                     [string] [default: "https://api.github.com"]
+  --repo-type                   Type of the repository hosting service. For
+                                \`gitea\`, \`--api-url\` should point at the
+                                Gitea/Forgejo instance, e.g.
+                                \`https://gitea.com\`.
+                       [string] [choices: "github", "gitea"] [default: "github"]
   --default-branch              The branch to open release PRs against and tag
                                 releases on
                               [deprecated: use --target-branch instead] [string]
@@ -98,6 +103,10 @@ Options:
                                     [string] [default: "https://api.github.com"]
   --graphql-url         URL to use when making GraphQL requests
                                     [string] [default: "https://api.github.com"]
+  --repo-type           Type of the repository hosting service. For \`gitea\`,
+                        \`--api-url\` should point at the Gitea/Forgejo instance,
+                        e.g. \`https://gitea.com\`.
+                       [string] [choices: "github", "gitea"] [default: "github"]
   --default-branch      The branch to open release PRs against and tag releases
                         on    [deprecated: use --target-branch instead] [string]
   --target-branch       The branch to open release PRs against and tag releases
@@ -144,6 +153,10 @@ Options:
                                     [string] [default: "https://api.github.com"]
   --graphql-url         URL to use when making GraphQL requests
                                     [string] [default: "https://api.github.com"]
+  --repo-type           Type of the repository hosting service. For \`gitea\`,
+                        \`--api-url\` should point at the Gitea/Forgejo instance,
+                        e.g. \`https://gitea.com\`.
+                       [string] [choices: "github", "gitea"] [default: "github"]
   --default-branch      The branch to open release PRs against and tag releases
                         on    [deprecated: use --target-branch instead] [string]
   --target-branch       The branch to open release PRs against and tag releases
@@ -196,6 +209,11 @@ Options:
                                     [string] [default: "https://api.github.com"]
   --graphql-url                     URL to use when making GraphQL requests
                                     [string] [default: "https://api.github.com"]
+  --repo-type                       Type of the repository hosting service. For
+                                    \`gitea\`, \`--api-url\` should point at the
+                                    Gitea/Forgejo instance, e.g.
+                                    \`https://gitea.com\`.
+                       [string] [choices: "github", "gitea"] [default: "github"]
   --default-branch                  The branch to open release PRs against and
                                     tag releases on
                               [deprecated: use --target-branch instead] [string]
