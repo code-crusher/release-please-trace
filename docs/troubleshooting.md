@@ -110,3 +110,18 @@ more API calls (which is one reason a manifest config is preferred).
 
 ### What if my release PR is merged with `autorelease:closed`?
 The release PR will be tagged with `autorelease:closed` on closing of the PR, but it will not be tagged with `autorelease:pending` on re-opening of the PR. Hence if a release PR was accidentally closed and re-opened before merging to main, release-please wouldn't be triggred. In such case, please manually remove `autorelease:closed`, add `autorelease: pending` and `release-please:force-run` to the release PR to force re-trigger the release process. See https://github.com/googleapis/google-cloud-java/pull/10615 for example.
+
+### Can release-please publish my action to the GitHub Marketplace?
+
+No. release-please creates GitHub releases through the
+[releases API](https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#create-a-release),
+which does not provide a way to publish an action to the GitHub Marketplace.
+The ["Publish this Action to the GitHub Marketplace"](https://docs.github.com/en/actions/creating-actions/publishing-actions-in-github-marketplace)
+checkbox is only available when editing a release in the web UI and publishing
+requires two-factor authentication, so this step cannot be automated and has to
+be done manually for each release.
+
+Note that the marketplace listing is only used for discovery: workflows
+referencing your action by tag (e.g., `uses: owner/repo@v1.2.3`) resolve
+against your repository's git tags, whether or not the release has been
+published to the marketplace.
